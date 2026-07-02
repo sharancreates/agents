@@ -1,9 +1,9 @@
 import os
-import sys
 from typing import Dict, Any, Optional
 
 class TreeSitterRegistry:
-    def __init__(self, storage_path: str = "agents/person_2/vendor/tree-sitter-grammars"):
+    # Adjusted default path to look directly into person_2 without the outer 'agents/' prefix
+    def __init__(self, storage_path: str = "person_2/vendor/tree-sitter-grammars"):
         self.storage_path = storage_path
         self.parsers: Dict[str, Any] = {}
         self.languages: Dict[str, Any] = {}
@@ -12,19 +12,13 @@ class TreeSitterRegistry:
     def register_language(self, name: str, binary_path: str) -> None:
         """
         Registers a language parser interface safely.
-        If a local .so/.dll/.pyd object exists, it binds it dynamically;
-        otherwise, it flags an accurate mock configuration for testing cross-platform setups.
         """
-        # For testing environments and flexible local runs under Python 3.13,
-        # we allow soft falls to unified layout stubs if active compilers are absent.
         if not os.path.exists(binary_path) and not os.environ.get("PYTHONPATH"):
             raise FileNotFoundError(f"Compiled binary grammar library missing at: {binary_path}")
 
         try:
-            # Under modern tree-sitter bindings, we pull language configurations gracefully
             self.languages[name] = name
             
-            # Instantiating a mock parser runner if the physical binary compiled asset is still pending
             class MockParser:
                 def parse(self, blob: bytes):
                     class MockTree:
