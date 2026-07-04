@@ -1,0 +1,237 @@
+[
+	{
+		"submission_id": "sub_001",
+		"team_name": "Neon Syndicate",
+		"repo_url": "https://github.com/neon-syndicate/defi-swap",
+		"pipeline_status": "complete",
+		"submitted_at": "2026-10-24T14:32:00Z",
+		"overall_score": 92.0,
+		"code_quality": {
+			"status": "complete",
+			"score": 95.0,
+			"summary": "Highly modular architecture with excellent error boundaries. Very clean code.",
+			"flags": [],
+			"raw_metrics": {
+				"complexity_score": 12,
+				"lint_warnings": 2,
+				"lint_severity": "low"
+			},
+			"error_message": null
+		},
+		"functionality": {
+			"status": "complete",
+			"score": 100.0,
+			"summary": "All core test cases passed seamlessly well within the sandbox time limits.",
+			"flags": [],
+			"raw_metrics": {
+				"tests_passed": 15,
+				"total_tests": 15,
+				"avg_runtime_ms": 142,
+				"peak_memory_mb": 45.2
+			},
+			"error_message": null
+		},
+		"originality": {
+			"status": "complete",
+			"score": 88.0,
+			"summary": "Unique implementation of the core trading loop. Standard boilerplate detected in the UI layer.",
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"innovation": {
+			"status": "complete",
+			"score": 85.0,
+			"summary": "Creative use of WebSockets for real-time order book updates.",
+			"flags": [],
+			"raw_metrics": {
+				"architecture_novelty": 8.0,
+				"techniques": ["Optimistic UI updates", "Custom retry hooks"]
+			},
+			"error_message": null
+		}
+	},
+	{
+		"submission_id": "sub_002",
+		"team_name": "Void Walkers",
+		"repo_url": "https://github.com/void-walkers/hack-entry",
+		"pipeline_status": "complete",
+		"submitted_at": "2026-10-24T15:10:00Z",
+		"overall_score": 41.0,
+		"code_quality": {
+			"status": "complete",
+			"score": 60.0,
+			"summary": "Significant code smells detected. High cyclomatic complexity in the main API routes.",
+			"flags": [
+				{
+					"type": "security_smell",
+					"message": "Hardcoded API secrets detected in config.js",
+					"reference_id": null
+				}
+			],
+			"raw_metrics": {
+				"complexity_score": 48,
+				"lint_warnings": 34,
+				"lint_severity": "high"
+			},
+			"error_message": null
+		},
+		"functionality": {
+			"status": "complete",
+			"score": 40.0,
+			"summary": "Failed multiple edge-case tests. Execution was slow and resource-heavy.",
+			"flags": [],
+			"raw_metrics": {
+				"tests_passed": 6,
+				"total_tests": 15,
+				"avg_runtime_ms": 1250,
+				"peak_memory_mb": 112.5
+			},
+			"error_message": null
+		},
+		"originality": {
+			"status": "complete",
+			"score": 10.0,
+			"summary": "High similarity detected with known public repositories.",
+			"flags": [
+				{
+					"type": "similarity_match",
+					"message": "94% AST match with submission sub_088",
+					"reference_id": "sub_088"
+				}
+			],
+			"raw_metrics": {
+				"similarity_confidence": 0.94
+			},
+			"error_message": null
+		},
+		"innovation": {
+			"status": "complete",
+			"score": 0.0,
+			"summary": "Evaluation skipped due to originality failure.",
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		}
+	},
+	{
+		"submission_id": "sub_003",
+		"team_name": "Cybernetic Oasis",
+		"repo_url": "https://github.com/cyber-oasis/health-tracker",
+		"pipeline_status": "running",
+		"submitted_at": "2026-10-24T18:45:00Z",
+		"overall_score": null,
+		"code_quality": {
+			"status": "complete",
+			"score": 92.0,
+			"summary": "Solid structural typing, minimal lint errors.",
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"functionality": {
+			"status": "running",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"originality": {
+			"status": "running",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"innovation": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		}
+	},
+	{
+		"submission_id": "sub_004",
+		"team_name": "Rogue Process",
+		"repo_url": "https://github.com/rogue-process/data-viz",
+		"pipeline_status": "failed",
+		"submitted_at": "2026-10-24T19:02:00Z",
+		"overall_score": null,
+		"code_quality": {
+			"status": "complete",
+			"score": 85.0,
+			"summary": "Acceptable code quality.",
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"functionality": {
+			"status": "failed",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": "Sandbox execution timeout. Infinite loop suspected in data parsing logic."
+		},
+		"originality": {
+			"status": "complete",
+			"score": 90.0,
+			"summary": "Original data visualization logic.",
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"innovation": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": "Pipeline halted due to functionality agent failure."
+		}
+	},
+	{
+		"submission_id": "sub_005",
+		"team_name": "Glitch Bound",
+		"repo_url": "https://github.com/glitch-bound/game-engine",
+		"pipeline_status": "pending",
+		"submitted_at": "2026-10-24T19:30:00Z",
+		"overall_score": null,
+		"code_quality": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"functionality": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"originality": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		},
+		"innovation": {
+			"status": "pending",
+			"score": null,
+			"summary": null,
+			"flags": [],
+			"raw_metrics": {},
+			"error_message": null
+		}
+	}
+]
