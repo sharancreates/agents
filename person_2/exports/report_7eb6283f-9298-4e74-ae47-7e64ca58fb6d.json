@@ -1,0 +1,21 @@
+{
+    "status": "success",
+    "summary": {
+        "total_files_evaluated": 1,
+        "overall_maintainability_rating": "HIGH",
+        "global_issue_count": 1
+    },
+    "metrics": {
+        "average_cyclomatic_complexity": 1.0,
+        "max_complexity_observed": 1
+    },
+    "file_breakdown": [
+        {
+            "file_path": "async_demo.py",
+            "language": "python",
+            "cyclomatic_complexity": 1,
+            "issues_found": 1,
+            "smells": []
+        }
+    ]
+}

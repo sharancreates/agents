@@ -2,32 +2,34 @@ import os
 import sys
 import uuid
 import json
-from datetime import datetime
-from typing import Dict, Any  # <-- Added missing type hint imports here
+from datetime import datetime, UTC
+from typing import Dict, Any
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 
-# Force Python to look in this exact directory for sister files
+# Force Python to check this exact folder for sister files
 CURRENT_API_DIR = os.path.dirname(os.path.abspath(__file__))
 if CURRENT_API_DIR not in sys.path:
     sys.path.insert(0, CURRENT_API_DIR)
 
 try:
     import schemas
+    from database import SessionLocal, TaskModel, init_db
 except ImportError:
     from person_2.api import schemas
+    from person_2.api.database import SessionLocal, TaskModel, init_db
 
 from person_2.core.aggregator import MetricsAggregator
 
+# Initialize the SQLite tables on startup automatically
+init_db()
+
 app = FastAPI(
     title="Code Quality Agent Microservice",
-    description="Asynchronous static code evaluation engine for Person 2 modules.",
-    version="1.1.0"
+    description="Persistent database-backed static code evaluation engine for Person 2.",
+    version="1.2.0"
 )
 
-# In-memory database to store tracking state definitions
-task_registry: Dict[str, Dict[str, Any]] = {}
-
-# Ensure an exports directory exists at the root of person_2
+# Ensure an exports directory exists
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 EXPORTS_DIR = os.path.join(BASE_DIR, "exports")
 os.makedirs(EXPORTS_DIR, exist_ok=True)
@@ -35,43 +37,47 @@ os.makedirs(EXPORTS_DIR, exist_ok=True)
 
 def background_analysis_worker(task_id: str, target_path: str):
     """
-    Executes deep static analysis processing asynchronously inside a background worker thread,
-    serializes a permanent export snapshot, and updates registry states.
+    Executes code evaluation on a worker thread, updates records, 
+    and saves serialized payloads permanently to disk.
     """
-    task_registry[task_id]["status"] = "PROCESSING"
-    
+    db = SessionLocal()
     try:
-        # Run our core static engine crawl
+        # 1. Update task status to PROCESSING in DB
+        db_task = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        if db_task:
+            db_task.status = "PROCESSING"
+            db.commit()
+
+        # 2. Run the heavy analysis crawl
         report_data = MetricsAggregator.evaluate_directory(target_path)
         
-        # Build the structured API schema format matches
         formatted_response = {
-            "status": "success",
-            "summary": report_data["summary"],
-            "metrics": report_data["metrics"],
-            "file_breakdown": report_data["file_breakdown"]
+          "status": "success",
+          "summary": report_data["summary"],
+          "metrics": report_data["metrics"],
+          "file_breakdown": report_data["file_breakdown"]
         }
         
-        # Save a serialized backup report directly into exports/
+        # 3. Save report to exports folder
         report_filename = f"report_{task_id}.json"
         report_filepath = os.path.join(EXPORTS_DIR, report_filename)
         with open(report_filepath, "w", encoding="utf-8") as f:
             json.dump(formatted_response, f, indent=4)
             
-        # Complete task lifecycle updates
-        task_registry[task_id].update({
-            "status": "COMPLETED",
-            "completed_at": datetime.utcnow().isoformat(),
-            "report_file": report_filepath,
-            "result": formatted_response
-        })
-        
+        # 4. Finalize the record entry tracking state
+        if db_task:
+            db_task.status = "COMPLETED"
+            db_task.completed_at = datetime.now(UTC)
+            db_task.report_file = report_filepath
+            db.commit()
+            
     except Exception as err:
-        task_registry[task_id].update({
-            "status": "FAILED",
-            "completed_at": datetime.utcnow().isoformat(),
-            "result": {"status": "error", "message": str(err)}
-        })
+        if db_task:
+            db_task.status = "FAILED"
+            db_task.completed_at = datetime.now(UTC)
+            db.commit()
+    finally:
+        db.close()
 
 
 @app.post(
@@ -83,8 +89,7 @@ def background_analysis_worker(task_id: str, target_path: str):
 async def analyze_codebase_sync(payload: schemas.AnalysisRequest):
     target_path = payload.directory_path
     if not os.path.exists(target_path) or not os.path.isdir(target_path):
-        raise HTTPException(status_code=404, detail="Target directory resource reference does not exist.")
-    
+        raise HTTPException(status_code=404, detail="Target directory reference does not exist.")
     try:
         report_data = MetricsAggregator.evaluate_directory(target_path)
         return {
@@ -104,10 +109,6 @@ async def analyze_codebase_sync(payload: schemas.AnalysisRequest):
     summary="Analyze Local Codebase Directory (Asynchronous)"
 )
 async def analyze_codebase_async(payload: schemas.AnalysisRequest, background_tasks: BackgroundTasks):
-    """
-    Ingests a system folder path, registers an execution tracking token, 
-    queues the core processing job to a background execution sequence, and releases connection handles.
-    """
     target_path = payload.directory_path
 
     if not os.path.exists(target_path):
@@ -117,17 +118,16 @@ async def analyze_codebase_async(payload: schemas.AnalysisRequest, background_ta
 
     task_id = str(uuid.uuid4())
     
-    # Initialize state inside registry tracking layout
-    task_registry[task_id] = {
-        "task_id": task_id,
-        "status": "PENDING",
-        "directory_path": target_path,
-        "completed_at": None,
-        "report_file": None,
-        "result": None
-    }
+    # Write initial record entry directly into the persistent DB
+    db = SessionLocal()
+    try:
+        new_task = TaskModel(task_id=task_id, status="PENDING", directory_path=target_path)
+        db.add(new_task)
+        db.commit()
+    finally:
+        db.close()
 
-    # Queue the task method over to FastAPI worker loops
+    # Hand off to async thread pools
     background_tasks.add_task(background_analysis_worker, task_id, target_path)
 
     return {
@@ -145,12 +145,26 @@ async def analyze_codebase_async(payload: schemas.AnalysisRequest, background_ta
     summary="Fetch Background Task Lifecycle Status"
 )
 async def get_task_status(task_id: str):
-    """
-    Queries the runtime tracking registry to return structural processing status or final aggregations.
-    """
-    if task_id not in task_registry:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Requested background execution token tracking reference '{task_id}' was not found."
-        )
-    return task_registry[task_id]
+    """Queries SQLite directly to fetch the complete tracking history."""
+    db = SessionLocal()
+    try:
+        task = db.query(TaskModel).filter(TaskModel.task_id == task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Requested background task token was not found.")
+        
+        # Read file results if execution finished
+        result_payload = None
+        if task.status == "COMPLETED" and task.report_file and os.path.exists(task.report_file):
+            with open(task.report_file, "r", encoding="utf-8") as f:
+                result_payload = json.load(f)
+
+        return {
+            "task_id": task.task_id,
+            "status": task.status,
+            "directory_path": task.directory_path,
+            "completed_at": task.completed_at.isoformat() if task.completed_at else None,
+            "report_file": task.report_file,
+            "result": result_payload
+        }
+    finally:
+        db.close()
