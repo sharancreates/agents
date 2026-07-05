@@ -4,7 +4,6 @@ import stat
 
 def install_pre_commit_hook():
     """Finds the local hidden .git/hooks directory and writes a pre-commit shell script."""
-    # Find the path of the 'agents' directory
     current_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(os.path.dirname(current_dir))
     
@@ -16,13 +15,13 @@ def install_pre_commit_hook():
 
     hook_path = os.path.join(git_hooks_dir, "pre-commit")
     
-    # Write the script contents that Git will execute during a commit lifecycle
+    # Swapped "python" for "py" to match your Windows environment launcher perfectly
     hook_content = f"""#!/bin/sh
 echo "🔍 Running Code Quality Agent Pre-Commit Automated Gate..."
 export PYTHONPATH="{project_root}"
 
-# Trigger the CLI engine against the current working directory
-python -m person_2 .
+# Trigger the CLI engine using the Windows Python launcher
+py -m person_2 .
 
 # Check the exit status code of our scan engine
 if [ $? -ne 0 ]; then
@@ -38,11 +37,10 @@ exit 0
         with open(hook_path, "w", newline="\n", encoding="utf-8") as f:
             f.write(hook_content)
         
-        # Give the script executable permissions (crucial for Linux/Git Bash setups)
         st = os.stat(hook_path)
         os.chmod(hook_path, st.st_mode | stat.S_IEXEC)
         
-        print(f"🎯 Pre-commit hook successfully installed at: {hook_path}")
+        print(f"🎯 Pre-commit hook successfully updated at: {hook_path}")
         return True
     except Exception as e:
         print(f"❌ Failed to write automated hook mapping: {str(e)}")
