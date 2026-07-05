@@ -1,0 +1,4 @@
+[submodule "agents"]
+	path = agents
+	url = https://github.com/sharancreates/agents.git
+	branch = feature/originality-agent
