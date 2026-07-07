@@ -4,6 +4,9 @@ import sys
 from person_2.functionality.models import TestCaseInput, FunctionalityConfig
 from person_2.functionality.runner import DynamicExecutionRunner
 
+# Tell pytest that this specific validation schema is a data model, not a test class container
+TestCaseInput.__test__ = False
+
 @pytest.fixture
 def target_scripts(tmpdir):
     """Generates sample problem submissions with specific runtime behaviors for validation."""
@@ -33,7 +36,8 @@ def test_successful_test_case_execution(target_scripts):
     ]
     config = FunctionalityConfig(timeout_seconds=2.0)
     
-    report = DynamicExecutionRunner.execute_python_script(target_scripts["passing"], test_cases, config)
+    # CRITICAL FIX: Routed to use the new unified multi-language execution contract
+    report = DynamicExecutionRunner.execute_script(target_scripts["passing"], test_cases, config)
     
     assert report.total_tests == 2
     assert report.passed_tests == 2
@@ -48,7 +52,7 @@ def test_failed_assertion_handling(target_scripts):
     ]
     config = FunctionalityConfig(timeout_seconds=2.0)
     
-    report = DynamicExecutionRunner.execute_python_script(target_scripts["passing"], test_cases, config)
+    report = DynamicExecutionRunner.execute_script(target_scripts["passing"], test_cases, config)
     
     assert report.passed_tests == 0
     assert report.success_rate == 0.0
@@ -61,7 +65,7 @@ def test_runtime_exception_handling(target_scripts):
     ]
     config = FunctionalityConfig(timeout_seconds=2.0)
     
-    report = DynamicExecutionRunner.execute_python_script(target_scripts["crashing"], test_cases, config)
+    report = DynamicExecutionRunner.execute_script(target_scripts["crashing"], test_cases, config)
     
     assert report.passed_tests == 0
     assert report.test_breakdown[0].passed is False
@@ -72,10 +76,9 @@ def test_infinite_loop_timeout_protection(target_scripts):
     test_cases = [
         TestCaseInput(test_id="TC5", input_data="loop", expected_output="ANY")
     ]
-    # Set a tiny hard timeout threshold to speed up unit test runs
     config = FunctionalityConfig(timeout_seconds=0.5)
     
-    report = DynamicExecutionRunner.execute_python_script(target_scripts["infinite"], test_cases, config)
+    report = DynamicExecutionRunner.execute_script(target_scripts["infinite"], test_cases, config)
     
     assert report.passed_tests == 0
     assert report.test_breakdown[0].passed is False

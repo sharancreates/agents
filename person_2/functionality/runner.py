@@ -2,11 +2,12 @@ import sys
 import time
 import subprocess
 import os
+import shutil
 from typing import List
 from person_2.functionality.models import TestCaseInput, FunctionalityConfig, TestCaseResult, FunctionalityReport
 
 class DynamicExecutionRunner:
-    """Safely executes third-party submission scripts and profiles exact execution metrics."""
+    """Safely executes multi-language third-party submission scripts and profiles exact execution metrics."""
 
     @classmethod
     def _get_peak_memory_linux(cls, pid: int) -> int:
@@ -54,12 +55,42 @@ class DynamicExecutionRunner:
         return 0
 
     @classmethod
-    def execute_python_script(
+    def _resolve_runtime_args(cls, script_path: str) -> List[str]:
+        """Routes execution strategy based on file extension mapping."""
+        _, ext = os.path.splitext(script_path.lower())
+        
+        if ext == ".py":
+            return [sys.executable, script_path]
+        elif ext == ".js":
+            node_exe = shutil.which("node") or "node"
+            return [node_exe, script_path]
+        elif ext == ".ts":
+            # Uses ts-node for dynamic execution if available, falls back to node
+            ts_node_exe = shutil.which("ts-node") or "ts-node"
+            return [ts_node_exe, script_path]
+        else:
+            raise ValueError(f"Unsupported environment extension: '{ext}'")
+
+    @classmethod
+    def execute_script(
         cls, script_path: str, test_cases: List[TestCaseInput], config: FunctionalityConfig
     ) -> FunctionalityReport:
         breakdown = []
         passed_count = 0
         global_peak_memory = 0
+
+        # Strategy routing based on script language profile
+        try:
+            cmd_args = cls._resolve_runtime_args(script_path)
+        except Exception as e:
+            return FunctionalityReport(
+                total_tests=len(test_cases),
+                passed_tests=0,
+                success_rate=0.0,
+                peak_memory_bytes=0,
+                test_breakdown=[],
+                error_summary=f"ROUTING_ERROR: {str(e)}"
+            )
 
         for tc in test_cases:
             start_time = time.perf_counter()
@@ -70,9 +101,9 @@ class DynamicExecutionRunner:
             proc = None
 
             try:
-                # Spawn process with explicit streaming pipes
+                # Spawn process with language-specific routing args
                 proc = subprocess.Popen(
-                    [sys.executable, script_path],
+                    cmd_args,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
@@ -80,10 +111,10 @@ class DynamicExecutionRunner:
                     bufsize=1
                 )
 
-                # CRITICAL FIX: Write standard inputs to the process pipe immediately to unblock stdin reads
+                # Write standard inputs to the process pipe immediately
                 if tc.input_data:
                     proc.stdin.write(tc.input_data)
-                proc.stdin.close()  # Close stream to indicate EOF
+                proc.stdin.close() 
 
                 # Active monitoring loop to profile memory usage while execution progresses
                 timeout_threshold = time.time() + config.timeout_seconds
@@ -92,7 +123,6 @@ class DynamicExecutionRunner:
                         proc.kill()
                         raise subprocess.TimeoutExpired(proc.args, config.timeout_seconds)
                     
-                    # Track platform-specific memory configurations
                     if os.name == "nt":
                         mem = cls._get_peak_memory_windows(int(proc._handle))
                     else:
@@ -102,7 +132,7 @@ class DynamicExecutionRunner:
                         case_peak_memory = mem
                     time.sleep(0.005)
 
-                # Read remaining flush outputs from buffers safely
+                # Read outputs safely
                 stdout, stderr = proc.communicate()
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
                 observed = stdout.strip() if stdout else ""
