@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 
 from person_2.functionality.models import TestCaseInput, FunctionalityConfig
 from person_2.functionality.runner import DynamicExecutionRunner
-# CRITICAL FIX: Import the main app instance to satisfy request scopes
+from person_2.functionality.services import run_background_evaluation_pipeline
 from person_2.main import app
 
 # Silence Pytest collection warning flags for Pydantic schema models
@@ -96,7 +96,6 @@ def test_api_endpoint_run_tests(target_scripts):
         "config": {"timeout_seconds": 2.0, "memory_limit_mb": 128}
     }
     
-    # Send a virtual HTTP POST payload to the mounted app target
     response = client.post("/v1/evaluation/run-tests", json=payload)
     
     assert response.status_code == 200
@@ -105,3 +104,29 @@ def test_api_endpoint_run_tests(target_scripts):
     assert data["total_tests"] == 1
     assert data["passed_tests"] == 1
     assert data["test_breakdown"][0]["passed"] is True
+
+def test_background_evaluation_pipeline_service(target_scripts):
+    """Verifies that the background worker service correctly consumes raw dicts and returns serialized results."""
+    raw_test_cases = [
+        {
+            "test_id": "BG_TC1",
+            "input_data": "service_pipeline_test",
+            "expected_output": "PROCESSED:service_pipeline_test"
+        }
+    ]
+    
+    # Run the background pipeline helper function
+    result_dict = run_background_evaluation_pipeline(
+        submission_id="sub_abc123",
+        script_path=target_scripts["passing"],
+        test_cases_raw=raw_test_cases,
+        timeout_seconds=2.0
+    )
+    
+    # Assertions to ensure it behaves like a standard Python dict payload for Celery/DB serialization
+    assert isinstance(result_dict, dict)
+    assert result_dict["status"] == "COMPLETED"
+    assert result_dict["total_tests"] == 1
+    assert result_dict["passed_tests"] == 1
+    assert result_dict["test_breakdown"][0]["test_id"] == "BG_TC1"
+    assert result_dict["test_breakdown"][0]["passed"] is True
