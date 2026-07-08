@@ -137,7 +137,7 @@ def test_composite_scoring_aggregation():
         total_tests=1,
         passed_tests=1,
         success_rate=100.0,
-        peak_memory_bytes=4194304,  # 4MB (Well within limits)
+        peak_memory_bytes=4194304,
         test_breakdown=[
             TestCaseResult(test_id="T1", passed=True, runtime_ms=12.5, observed_output="OK", error_message=None)
         ]
@@ -156,7 +156,32 @@ def test_composite_scoring_aggregation():
     
     assert report.submission_id == "sub_999"
     assert report.functionality_score == 100.0
-    assert report.code_quality_score == 90.0  # 100 - (2 * 5)
-    assert report.efficiency_score == 100.0   # No penalties
-    assert report.final_weighted_grade == 9.8 # (60 + 18 + 20) / 10
+    assert report.code_quality_score == 90.0
+    assert report.efficiency_score == 100.0
+    assert report.final_weighted_grade == 9.8
     assert report.verdict == "ACCEPTED_EXCELLENT"
+
+def test_api_endpoint_score_submission(target_scripts):
+    """Verifies that the composite endpoint processes execution runs and merges static reports smoothly."""
+    payload = {
+        "submission_id": "sub_api_composite",
+        "script_path": target_scripts["passing"],
+        "test_cases": [
+            {"test_id": "COMP_1", "input_data": "api_score_run", "expected_output": "PROCESSED:api_score_run"}
+        ],
+        "static_metrics": {
+            "smell_count": 0,
+            "cyclomatic_complexity": 2
+        },
+        "config": {"timeout_seconds": 2.0}
+    }
+    
+    response = client.post("/v1/evaluation/score-submission", json=payload)
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["submission_id"] == "sub_api_composite"
+    assert data["functionality_score"] == 100.0
+    assert data["code_quality_score"] == 100.0
+    assert data["final_weighted_grade"] == 10.0
+    assert data["verdict"] == "ACCEPTED_EXCELLENT"
