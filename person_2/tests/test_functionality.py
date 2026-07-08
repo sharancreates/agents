@@ -3,13 +3,15 @@ import pytest
 import sys
 from fastapi.testclient import TestClient
 
-from person_2.functionality.models import TestCaseInput, FunctionalityConfig
+from person_2.functionality.models import TestCaseInput, FunctionalityConfig, TestCaseResult, FunctionalityReport
 from person_2.functionality.runner import DynamicExecutionRunner
 from person_2.functionality.services import run_background_evaluation_pipeline
+from person_2.functionality.scoring import EvaluationScoringEngine
 from person_2.main import app
 
 # Silence Pytest collection warning flags for Pydantic schema models
 TestCaseInput.__test__ = False
+TestCaseResult.__test__ = False
 
 # Initialize the automated FastAPI mock network test framework on the full app
 client = TestClient(app)
@@ -115,7 +117,6 @@ def test_background_evaluation_pipeline_service(target_scripts):
         }
     ]
     
-    # Run the background pipeline helper function
     result_dict = run_background_evaluation_pipeline(
         submission_id="sub_abc123",
         script_path=target_scripts["passing"],
@@ -123,10 +124,39 @@ def test_background_evaluation_pipeline_service(target_scripts):
         timeout_seconds=2.0
     )
     
-    # Assertions to ensure it behaves like a standard Python dict payload for Celery/DB serialization
     assert isinstance(result_dict, dict)
     assert result_dict["status"] == "COMPLETED"
     assert result_dict["total_tests"] == 1
     assert result_dict["passed_tests"] == 1
     assert result_dict["test_breakdown"][0]["test_id"] == "BG_TC1"
     assert result_dict["test_breakdown"][0]["passed"] is True
+
+def test_composite_scoring_aggregation():
+    """Verifies that the grading engine properly weighs static and dynamic inputs to output a verdict."""
+    mock_func_report = FunctionalityReport(
+        total_tests=1,
+        passed_tests=1,
+        success_rate=100.0,
+        peak_memory_bytes=4194304,  # 4MB (Well within limits)
+        test_breakdown=[
+            TestCaseResult(test_id="T1", passed=True, runtime_ms=12.5, observed_output="OK", error_message=None)
+        ]
+    )
+    
+    mock_static_metrics = {
+        "smell_count": 2,
+        "cyclomatic_complexity": 3
+    }
+    
+    report = EvaluationScoringEngine.calculate_composite_grade(
+        submission_id="sub_999",
+        func_report=mock_func_report,
+        static_metrics=mock_static_metrics
+    )
+    
+    assert report.submission_id == "sub_999"
+    assert report.functionality_score == 100.0
+    assert report.code_quality_score == 90.0  # 100 - (2 * 5)
+    assert report.efficiency_score == 100.0   # No penalties
+    assert report.final_weighted_grade == 9.8 # (60 + 18 + 20) / 10
+    assert report.verdict == "ACCEPTED_EXCELLENT"
