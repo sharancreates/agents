@@ -1,47 +1,66 @@
+/**
+ * Calculates the composite score for a submission based on agent evaluations.
+ * Enforces that code_quality, functionality, and originality are REQUIRED dimensions.
+ * Treats innovation as an OPTIONAL dimension.
+ * 
+ * @param {Object} submission - The submission object to evaluate.
+ * @returns {number|null} - Composite score out of 100 (rounded to 1 decimal place) or null if incomplete.
+ */
 export function calculateSynthesisScore(submission) {
-	// Define base weights (these will become configurable via the UI in Week 3)
-	const baseWeights = {
+	if (!submission) return null;
+
+	// Base weights for each dimension
+	const weights = {
 		code_quality: 40,
 		functionality: 40,
 		originality: 20,
-		innovation: 10, // Treated as optional for now
+		innovation: 10, // Optional
 	};
 
-	let totalWeightedScore = 0;
-	let activeTotalWeight = 0;
-
-	// Helper to safely extract a score if the agent has completed its run
-	const getScore = (dimension) => {
-		if (
-			submission[dimension] &&
-			typeof submission[dimension].score === "number"
-		) {
-			return submission[dimension].score;
+	// Helper to extract a valid numerical score
+	const getValidScore = (dimension) => {
+		const dim = submission[dimension];
+		if (dim && dim.status === "complete" && typeof dim.score === "number") {
+			return dim.score;
 		}
 		return null;
 	};
 
-	const scores = {
-		code_quality: getScore("code_quality"),
-		functionality: getScore("functionality"),
-		originality: getScore("originality"),
-		innovation: getScore("innovation"),
-	};
-
-	// Calculate the weighted total based ONLY on available scores
-	for (const [dimension, score] of Object.entries(scores)) {
-		if (score !== null) {
-			totalWeightedScore += score * baseWeights[dimension];
-			activeTotalWeight += baseWeights[dimension];
+	// Required dimensions
+	const requiredDimensions = ["code_quality", "functionality", "originality"];
+	
+	// Check if all required dimensions are complete and have numerical scores
+	const requiredScores = {};
+	for (const dim of requiredDimensions) {
+		const score = getValidScore(dim);
+		if (score === null) {
+			// One or more required dimensions are not complete yet
+			return null;
 		}
+		requiredScores[dim] = score;
 	}
 
-	// If no agents have successfully returned a score yet, return null
-	if (activeTotalWeight === 0) return null;
+	// Start with required dimensions
+	let totalWeightedScore = 
+		requiredScores.code_quality * weights.code_quality +
+		requiredScores.functionality * weights.functionality +
+		requiredScores.originality * weights.originality;
+		
+	let totalActiveWeight = 
+		weights.code_quality + 
+		weights.functionality + 
+		weights.originality;
 
-	// Normalize back to a 100-point scale based on the active weights
-	const finalScore = totalWeightedScore / activeTotalWeight;
+	// Check optional innovation score
+	const innovationScore = getValidScore("innovation");
+	if (innovationScore !== null) {
+		totalWeightedScore += innovationScore * weights.innovation;
+		totalActiveWeight += weights.innovation;
+	}
 
-	// Round to one decimal place for a clean UI presentation
+	// Calculate and normalize to a 100-point scale
+	const finalScore = totalWeightedScore / totalActiveWeight;
+
+	// Round to one decimal place
 	return Math.round(finalScore * 10) / 10;
 }

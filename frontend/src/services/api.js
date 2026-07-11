@@ -1,45 +1,54 @@
 import mockSubmissions from "../mockData/submissions.json";
 
-export const fetchSubmissions = async () => {
-	// Simulate an 800ms network delay to mimic the real FastAPI backend
-	return new Promise((resolve) => {
-		setTimeout(() => {
-			resolve(mockSubmissions);
-		}, 800);
-	});
-};
-
-export const fetchSubmissionById = async (id) => {
-	return new Promise((resolve, reject) => {
-		setTimeout(() => {
-			const submission = mockSubmissions.find(
-				(sub) => sub.submission_id === id,
-			);
-			if (submission) {
-				resolve(submission);
-			} else {
-				reject(new Error("Submission not found"));
-			}
-		}, 500);
-	});
-};
-
 // The base URL for Person 1's FastAPI orchestrator
 const API_BASE_URL = "http://localhost:8000/api";
 
+/**
+ * Helper to simulate a network delay when returning mock data
+ */
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const fetchSubmissions = async () => {
-	const response = await fetch(`${API_BASE_URL}/submissions`);
-	if (!response.ok) {
-		throw new Error(`API Error: ${response.status} ${response.statusText}`);
+	try {
+		const response = await fetch(`${API_BASE_URL}/submissions`);
+		if (!response.ok) {
+			throw new Error(`API Error: ${response.status} ${response.statusText}`);
+		}
+		const data = await response.json();
+		console.log("Successfully fetched submissions from live API");
+		return data;
+	} catch (err) {
+		console.warn(
+			"FastAPI backend connection failed. Falling back to local mock data.",
+			err.message,
+		);
+		// Simulate network latency for mock data to keep the loading states visible
+		await delay(800);
+		return mockSubmissions;
 	}
-	return response.json();
 };
 
 export const fetchSubmissionById = async (id) => {
-	// Assuming P1 built the specific endpoint for the detail view
-	const response = await fetch(`${API_BASE_URL}/submissions/${id}/status`);
-	if (!response.ok) {
-		throw new Error(`API Error: ${response.status} ${response.statusText}`);
+	try {
+		// Attempting P1's status detail endpoint
+		const response = await fetch(`${API_BASE_URL}/submissions/${id}/status`);
+		if (!response.ok) {
+			throw new Error(`API Error: ${response.status} ${response.statusText}`);
+		}
+		const data = await response.json();
+		console.log(`Successfully fetched details for ${id} from live API`);
+		return data;
+	} catch (err) {
+		console.warn(
+			`FastAPI backend connection failed for submission ${id}. Falling back to local mock data.`,
+			err.message,
+		);
+		await delay(500);
+		const submission = mockSubmissions.find((sub) => sub.submission_id === id);
+		if (submission) {
+			return submission;
+		} else {
+			throw new Error("Submission not found");
+		}
 	}
-	return response.json();
 };

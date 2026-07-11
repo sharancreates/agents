@@ -2,7 +2,7 @@ import { useParams, Link } from "react-router-dom";
 import { useSubmissionDetail } from "../hooks/useSubmissionDetail";
 import StatusIndicator from "../components/submissions/StatusIndicator";
 import RawJsonDebugger from "../components/report/RawJsonDebugger";
-// import ReportContainer from '../components/report/ReportContainer'; // Commented out for Week 2 debugging
+import ReportContainer from "../components/report/ReportContainer";
 
 export default function SubmissionDetail() {
 	const { id } = useParams();
@@ -95,10 +95,11 @@ export default function SubmissionDetail() {
 				</div>
 			</header>
 
+			{/* The structured evaluation report */}
+			<ReportContainer submission={submission} />
+
 			{/* The raw data view for P2 and P3 to debug their agents */}
 			<RawJsonDebugger data={submission} />
-
-			{/* <ReportContainer submission={submission} /> */}
 		</div>
 	);
 }
