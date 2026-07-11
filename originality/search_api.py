@@ -26,48 +26,55 @@ except ImportError as e:
     # Raise a clean ImportError rather than failing later with NameError
     raise ImportError(error_msg) from e
 
-# Safe imports for db_client and pipeline modules
+# Safe imports for db_client, pipeline, and parser modules
 try:
     from originality.db_client import DatabaseManager
     from originality.pipeline import EmbeddingClient
+    from originality.parser import normalize_ast
 except ImportError:
     try:
         from db_client import DatabaseManager
         from pipeline import EmbeddingClient
+        from parser import normalize_ast
     except ImportError as e:
-        logger.error("Failed to import DatabaseManager or EmbeddingClient. Check module paths.")
+        logger.error("Failed to import DatabaseManager, EmbeddingClient, or normalize_ast. Check module paths.")
         raise e
 
 # Helper to clean arbitrary raw code snippets submitted to the API
 def clean_raw_code(raw_source: str) -> str:
     """
     Cleans raw code snippet by removing docstrings, comments, and extra whitespaces.
-    This replicates the Day 2 AST cleaning parser for input snippets.
+    Standardizes variable names using the AST normalizer to eliminate variable-rename obfuscation.
     """
     if not raw_source:
         return ""
     
-    cleaned = raw_source
     try:
         # Parse snippet to AST to identify and strip docstrings
         tree = ast.parse(raw_source)
+        
+        # 1. Strip docstrings at AST level
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
-                docstring = ast.get_docstring(node)
-                if docstring:
-                    # Strip block docstrings
-                    cleaned = cleaned.replace(f'"""{docstring}"""', '')
-                    cleaned = cleaned.replace(f"'''{docstring}'''", '')
-    except Exception:
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.body and isinstance(node.body[0], ast.Expr):
+                    val = node.body[0].value
+                    if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                        node.body.pop(0)
+                        if not node.body:
+                            node.body.append(ast.Pass())
+                            
+        # 2. Normalize AST variable and parameter names
+        normalize_ast(tree)
+        
+        # 3. Unparse back to clean, standardized python source
+        cleaned = ast.unparse(tree).strip()
+        return cleaned
+    except Exception as e:
+        logger.warning(f"AST cleaning in API failed: {e}")
         # Fallback to regex cleaning if AST parsing fails on partial/malformed snippets
-        pass
-
-    # Regex to remove single line comments (# ...)
-    cleaned = re.sub(re.compile(r"#.*?\n"), "\n", cleaned)
-    
-    # Minimize extra whitespace lines
-    cleaned = re.sub(r'\n\s*\n', '\n', cleaned).strip()
-    return cleaned
+        cleaned = re.sub(re.compile(r"#.*?\n"), "\n", raw_source)
+        cleaned = re.sub(r'\n\s*\n', '\n', cleaned).strip()
+        return cleaned
 
 # FastAPI Application Definition
 app = FastAPI(

@@ -19,12 +19,14 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:
     from originality.db_client import DatabaseManager
     from originality.pipeline import EmbeddingClient
+    from originality.parser import normalize_ast
 except ImportError:
     try:
         from db_client import DatabaseManager
         from pipeline import EmbeddingClient
+        from parser import normalize_ast
     except ImportError as e:
-        logger.error("Failed to import DatabaseManager or EmbeddingClient.")
+        logger.error("Failed to import DatabaseManager, EmbeddingClient, or normalize_ast.")
         raise e
 
 # Setup search_api import with local fallback to prevent script failure when FastAPI is missing
@@ -37,19 +39,26 @@ def clean_raw_code_local(raw_source: str) -> str:
     """Fallback clean code function if search_api cannot be imported."""
     if not raw_source:
         return ""
-    cleaned = raw_source
     try:
         tree = ast.parse(raw_source)
+        # Strip docstrings
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef, ast.Module)):
-                docstring = ast.get_docstring(node)
-                if docstring:
-                    cleaned = cleaned.replace(f'"""{docstring}"""', '').replace(f"'''{docstring}'''", '')
-    except Exception:
-        pass
-    cleaned = re.sub(re.compile(r"#.*?\n"), "\n", cleaned)
-    cleaned = re.sub(r'\n\s*\n', '\n', cleaned).strip()
-    return cleaned
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                if node.body and isinstance(node.body[0], ast.Expr):
+                    val = node.body[0].value
+                    if isinstance(val, ast.Constant) and isinstance(val.value, str):
+                        node.body.pop(0)
+                        if not node.body:
+                            node.body.append(ast.Pass())
+        # Apply AST variable-rename normalization
+        normalize_ast(tree)
+        cleaned = ast.unparse(tree).strip()
+        return cleaned
+    except Exception as e:
+        logger.warning(f"AST local cleaning failed: {e}")
+        cleaned = re.sub(re.compile(r"#.*?\n"), "\n", raw_source)
+        cleaned = re.sub(r'\n\s*\n', '\n', cleaned).strip()
+        return cleaned
 
 try:
     from originality.search_api import app, SearchRequest, search_similar_code, clean_raw_code
@@ -73,6 +82,15 @@ def calculate_factorial(n):
         return 1
     else:
         return n * calculate_factorial(n - 1)
+"""
+
+RENAME_SOURCE = """
+def calculate_factorial(x):
+    # Parameter renamed from n to x, no other edits
+    if x == 0:
+        return 1
+    else:
+        return x * calculate_factorial(x - 1)
 """
 
 REFACTORED_SOURCE = """
@@ -148,6 +166,7 @@ def execute_verification_loop():
 
     test_cases = [
         {"name": "Verbatim Code (Exact Match)", "code": EXACT_SOURCE, "expected": "Exact Match"},
+        {"name": "Parameter Rename Obfuscation (Exact Match via normalization)", "code": RENAME_SOURCE, "expected": "Exact Match"},
         {"name": "Slightly Obfuscated Code (Suspicious/Refactored)", "code": REFACTORED_SOURCE, "expected": "Suspicious/Refactored"},
         {"name": "Independent logic (Original)", "code": ORIGINAL_SOURCE, "expected": "Original"}
     ]
