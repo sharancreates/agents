@@ -1,51 +1,31 @@
-import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { fetchSubmissionById } from "../services/api";
-import ReportContainer from "../components/report/ReportContainer";
+import { useSubmissionDetail } from "../hooks/useSubmissionDetail";
 import StatusIndicator from "../components/submissions/StatusIndicator";
+import RawJsonDebugger from "../components/report/RawJsonDebugger";
+import ReportContainer from "../components/report/ReportContainer";
 
 export default function SubmissionDetail() {
 	const { id } = useParams();
-	const [submission, setSubmission] = useState(null);
-	const [isLoading, setIsLoading] = useState(true);
-	const [error, setError] = useState(null);
 
-	useEffect(() => {
-		let isMounted = true;
-		const loadData = async () => {
-			try {
-				setIsLoading(true);
-				const data = await fetchSubmissionById(id);
-				if (isMounted) {
-					setSubmission(data);
-					setError(null);
-				}
-			} catch (err) {
-				if (isMounted) setError(err.message);
-			} finally {
-				if (isMounted) setIsLoading(false);
-			}
-		};
-		loadData();
-		return () => {
-			isMounted = false;
-		};
-	}, [id]);
+	// Using the new live-polling hook!
+	const { submission, isLoading, error } = useSubmissionDetail(id);
 
-	if (isLoading)
+	if (isLoading && !submission) {
 		return (
 			<div
 				style={{
-					color: "var(--accent-cyan)",
+					color: "#82B3C9",
 					fontFamily: "var(--font-mono)",
 					textAlign: "center",
 					padding: "4rem",
 				}}
 			>
-				Compiling report data...
+				Establishing secure connection...
 			</div>
 		);
-	if (error)
+	}
+
+	if (error) {
 		return (
 			<div
 				style={{
@@ -57,6 +37,8 @@ export default function SubmissionDetail() {
 				Error: {error}
 			</div>
 		);
+	}
+
 	if (!submission) return null;
 
 	return (
@@ -105,41 +87,19 @@ export default function SubmissionDetail() {
 							href={submission.repo_url}
 							target="_blank"
 							rel="noreferrer"
-							style={{ color: "var(--accent-cyan)" }}
+							style={{ color: "#82B3C9" }}
 						>
 							View Repository
 						</a>
 					</div>
 				</div>
-
-				<div style={{ textAlign: "right" }}>
-					<div
-						style={{
-							fontSize: "0.85rem",
-							color: "var(--text-secondary)",
-							textTransform: "uppercase",
-							letterSpacing: "1px",
-							marginBottom: "0.25rem",
-						}}
-					>
-						Overall Synthesis Score
-					</div>
-					<div
-						style={{
-							fontFamily: "var(--font-mono)",
-							fontSize: "2.5rem",
-							fontWeight: 800,
-							color: "var(--accent-green)",
-						}}
-					>
-						{submission.overall_score !== null
-							? submission.overall_score
-							: "--"}
-					</div>
-				</div>
 			</header>
 
+			{/* The structured evaluation report */}
 			<ReportContainer submission={submission} />
+
+			{/* The raw data view for P2 and P3 to debug their agents */}
+			<RawJsonDebugger data={submission} />
 		</div>
 	);
 }

@@ -1,9 +1,9 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "../context/AuthContext";
-import MainLayout from "../components/layout/MainLayout";
-import Dashboard from "../pages/Dashboard";
-import SubmissionDetail from "../pages/SubmissionDetail";
-import Login from "../pages/Login";
+import { AuthProvider } from "./context/AuthContext";
+import MainLayout from "./components/layout/MainLayout";
+import Dashboard from "./pages/Dashboard";
+import SubmissionDetail from "./pages/SubmissionDetail";
+import Login from "./pages/Login";
 
 function App() {
 	return (
