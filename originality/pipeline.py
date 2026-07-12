@@ -135,6 +135,23 @@ class EmbeddingClient:
         # Deterministic, unit-normalized hash-based fallback embedding
         return self._generate_mock_embedding(text)
 
+    def get_embeddings(self, texts: list) -> list:
+        """
+        Generates vector embeddings for a list of input texts in a batch.
+        """
+        if not texts:
+            return []
+
+        if self.encoder is not None:
+            try:
+                # Encode multiple texts in a batch
+                embeddings = self.encoder.encode(texts).tolist()
+                return embeddings
+            except Exception as e:
+                logger.error(f"[Embedding] Error during batch encoding: {e}. Falling back to mock.")
+
+        return [self._generate_mock_embedding(t) for t in texts]
+
     def _generate_mock_embedding(self, text: str) -> list:
         """
         Generates a unit-normalized, deterministic mock embedding based on input text hash.
@@ -154,13 +171,13 @@ class EmbeddingClient:
             return [0.0] * self.dimension
         return [x / magnitude for x in raw_vector]
 
-def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM-L6-v2"):
+def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM-L6-v2", batch_size: int = 32):
     """
     Main orchestration function to crawl directories, skip ignored paths,
-    parse files, encode source code, and upsert records to pgvector.
+    parse files, encode source code in batches, and bulk upsert records to pgvector.
     """
     root_dir = Path(directory_path).resolve()
-    logger.info(f"[Pipeline] Starting integration pipeline on: {root_dir}")
+    logger.info(f"[Pipeline] Starting batch integration pipeline (batch size={batch_size}) on: {root_dir}")
     
     # Initialize components
     matcher = GitignoreMatcher(str(root_dir))
@@ -172,7 +189,7 @@ def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM
     except Exception as e:
         logger.error(f"[Pipeline] Database connection failed. Ensure Docker is running. Error: {e}")
         return
-
+ 
     # Statistics tracking
     stats = {
         "files_scanned": 0,
@@ -181,6 +198,36 @@ def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM
         "functions_indexed": 0,
         "errors": 0
     }
+ 
+    batch_buffer = []
+
+    def flush_batch():
+        if not batch_buffer:
+            return
+        try:
+            # 1. Generate embeddings in bulk
+            logger.info(f"[Pipeline] Vectorizing a batch of {len(batch_buffer)} functions...")
+            sources = [item["cleaned_source"] for item in batch_buffer]
+            embeddings = embedder.get_embeddings(sources)
+            
+            # 2. Map embeddings to records and perform bulk DB insertion
+            db_records = []
+            for item, embedding in zip(batch_buffer, embeddings):
+                db_records.append((
+                    item["file_path"],
+                    item["function_name"],
+                    item["signature"],
+                    item["cleaned_source"],
+                    embedding
+                ))
+            
+            DatabaseManager.bulk_upsert_function_embeddings(db_records)
+            stats["functions_indexed"] += len(batch_buffer)
+        except Exception as e:
+            logger.error(f"[Pipeline] Failed to flush batch: {e}")
+            stats["errors"] += len(batch_buffer)
+        finally:
+            batch_buffer.clear()
 
     # Walk directory tree
     for root, dirs, files in os.walk(root_dir):
@@ -200,41 +247,36 @@ def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM
                 logger.info(f"[Pipeline] Skipped ignored file: {os.path.relpath(file_path, root_dir)}")
                 stats["files_skipped"] += 1
                 continue
-
+ 
             # Process file
             logger.info(f"[Pipeline] Parsing: {os.path.relpath(file_path, root_dir)}")
             try:
-                # 1. Parse functions and methods
                 functions = extract_functions_from_file(file_path)
                 if not functions:
                     continue
                 
                 stats["files_parsed"] += 1
+                relative_path = os.path.relpath(file_path, root_dir)
                 
-                # 2. Iterate and generate embeddings
                 for func in functions:
-                    func_name = func["function_name"]
-                    signature = func["signature"]
-                    cleaned_code = func["cleaned_source"]
+                    batch_buffer.append({
+                        "file_path": relative_path,
+                        "function_name": func["function_name"],
+                        "signature": func["signature"],
+                        "cleaned_source": func["cleaned_source"]
+                    })
                     
-                    # Compute vector embedding
-                    embedding = embedder.get_embedding(cleaned_code)
-                    
-                    # 3. Upsert to the PostgreSQL database
-                    relative_path = os.path.relpath(file_path, root_dir)
-                    DatabaseManager.upsert_function_embedding(
-                        file_path=relative_path,
-                        function_name=func_name,
-                        signature=signature,
-                        cleaned_source=cleaned_code,
-                        embedding=embedding
-                    )
-                    stats["functions_indexed"] += 1
-                    
+                    if len(batch_buffer) >= batch_size:
+                        flush_batch()
+                        
             except Exception as e:
                 logger.error(f"[Pipeline] Failed to process {file}: {e}")
                 stats["errors"] += 1
 
+    # Flush any remaining functions in buffer
+    if batch_buffer:
+        flush_batch()
+ 
     # Print summary reports
     logger.info("================ Pipeline Execution Report ================")
     logger.info(f"  Total Files Scanned   : {stats['files_scanned']}")
@@ -243,7 +285,7 @@ def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM
     logger.info(f"  Functions Indexed     : {stats['functions_indexed']}")
     logger.info(f"  Exceptions Handled    : {stats['errors']}")
     logger.info("===========================================================")
-
+ 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Orchestrator pipeline for indexing codebase vectors.")
     parser.add_argument(
@@ -257,6 +299,12 @@ if __name__ == "__main__":
         choices=["all-MiniLM-L6-v2", "text-embedding-3-small"],
         help="Embedding model name to use."
     )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=32,
+        help="Batch size for vectorization and database insertion."
+    )
     args = parser.parse_args()
-
-    process_codebase_pipeline(directory_path=args.dir, model_name=args.model)
+ 
+    process_codebase_pipeline(directory_path=args.dir, model_name=args.model, batch_size=args.batch_size)

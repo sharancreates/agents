@@ -168,6 +168,38 @@ class DatabaseManager:
             raise
 
     @classmethod
+    def bulk_upsert_function_embeddings(cls, records: list):
+        """
+        Performs high-performance batch upsert of multiple function embeddings
+        using psycopg2's execute_values.
+        
+        Args:
+            records: A list of tuples or lists:
+                     [(file_path, function_name, signature, cleaned_source, embedding), ...]
+        """
+        if not records:
+            return
+
+        query = """
+        INSERT INTO originality_embeddings (file_path, function_name, signature, cleaned_source, embedding)
+        VALUES %s
+        ON CONFLICT (file_path, function_name)
+        DO UPDATE SET
+            signature = EXCLUDED.signature,
+            cleaned_source = EXCLUDED.cleaned_source,
+            embedding = EXCLUDED.embedding,
+            created_at = CURRENT_TIMESTAMP;
+        """
+        try:
+            from psycopg2.extras import execute_values
+            with cls.get_cursor() as cursor:
+                execute_values(cursor, query, records)
+            logger.info(f"[DB] Bulk saved {len(records)} embeddings successfully.")
+        except Exception as e:
+            logger.error(f"[DB] Failed bulk upsert for {len(records)} records: {e}")
+            raise
+
+    @classmethod
     def query_similar_functions(
         cls, query_embedding: list, limit: int = 5, metric: str = "cosine"
     ) -> list:
