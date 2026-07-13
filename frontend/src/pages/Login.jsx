@@ -18,10 +18,10 @@ export default function Login() {
 		// Simple simulation of authentication with feedback
 		setTimeout(() => {
 			if (username.trim() === "" || password.trim() === "") {
-				setError("SYSTEM ERROR: CREDENTIALS CANNOT BE BLANK");
+				setError("Invalid credentials. Operator code and token cannot be blank.");
 				setIsSubmitting(false);
 			} else {
-				login();
+				login(username);
 				navigate("/");
 			}
 		}, 800);
@@ -35,78 +35,65 @@ export default function Login() {
 				justifyContent: "center",
 				alignItems: "center",
 				padding: "1.5rem",
-				background: "var(--bg-void)",
-				backgroundImage: "radial-gradient(circle at 50% 50%, rgba(0, 229, 255, 0.08) 0%, transparent 60%)",
+				backgroundColor: "var(--bg-page)",
+				backgroundImage: "radial-gradient(circle at 50% 50%, rgba(99, 102, 241, 0.05) 0%, transparent 60%)",
 			}}
 		>
 			<div
-				className="glass-panel"
+				className="card"
 				style={{
 					width: "100%",
-					maxWidth: "420px",
+					maxWidth: "400px",
 					padding: "2.5rem 2rem",
-					border: "1px solid var(--glass-border)",
-					boxShadow: "0 20px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(0, 229, 255, 0.05)",
-					textAlign: "center",
+					boxShadow: "0 10px 30px rgba(0, 0, 0, 0.5)",
 				}}
 			>
-				{/* Glowing Status Indicator logo */}
+				{/* Top Branding Section */}
 				<div
 					style={{
 						display: "flex",
-						justifyContent: "center",
+						flexDirection: "column",
 						alignItems: "center",
 						gap: "0.5rem",
-						marginBottom: "1.5rem",
+						marginBottom: "2rem",
+						textAlign: "center",
 					}}
 				>
 					<div
 						style={{
-							width: "12px",
-							height: "12px",
-							background: "var(--accent-cyan)",
+							width: "10px",
+							height: "10px",
+							background: "var(--accent)",
 							borderRadius: "50%",
-							boxShadow: "0 0 10px var(--accent-cyan)",
-							animation: "pulse 2s infinite ease-in-out",
+							boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)",
 						}}
 					></div>
-					<strong
+					<h1
 						style={{
-							fontSize: "1.5rem",
-							letterSpacing: "2px",
-							textTransform: "uppercase",
-							fontFamily: "var(--font-mono)",
+							fontSize: "1.25rem",
+							fontWeight: 600,
+							letterSpacing: "-0.01em",
 						}}
 					>
-						AUTO<span style={{ color: "var(--accent-cyan)" }}>JUDGE</span>
-					</strong>
+						AutoJudge
+					</h1>
+					<p style={{ color: "var(--text-secondary)", fontSize: "0.8rem", marginTop: "0.25rem" }}>
+						Enter operator details to establish session
+					</p>
 				</div>
-
-				<h2
-					style={{
-						fontSize: "0.9rem",
-						color: "var(--text-secondary)",
-						fontFamily: "var(--font-mono)",
-						letterSpacing: "1px",
-						textTransform: "uppercase",
-						marginBottom: "2rem",
-					}}
-				>
-					SECURE TERMINAL SIGN-IN
-				</h2>
 
 				{error && (
 					<div
 						style={{
-							background: "rgba(255, 0, 85, 0.1)",
-							border: "1px solid var(--accent-red)",
-							color: "var(--accent-red)",
+							background: "var(--status-failed-bg)",
+							border: "1px solid var(--status-failed-border)",
+							color: "var(--status-failed)",
 							padding: "0.75rem",
-							borderRadius: "4px",
-							fontSize: "0.8rem",
-							fontFamily: "var(--font-mono)",
+							borderRadius: "var(--radius-sm)",
+							fontSize: "0.8125rem",
 							marginBottom: "1.5rem",
 							textAlign: "left",
+							lineHeight: "1.4",
 						}}
 					>
 						{error}
@@ -114,18 +101,8 @@ export default function Login() {
 				)}
 
 				<form onSubmit={handleLoginSubmit} style={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}>
-					<div style={{ textAlign: "left" }}>
-						<label
-							htmlFor="username"
-							style={{
-								display: "block",
-								fontSize: "0.75rem",
-								color: "var(--text-secondary)",
-								fontFamily: "var(--font-mono)",
-								textTransform: "uppercase",
-								marginBottom: "0.5rem",
-							}}
-						>
+					<div className="form-group">
+						<label htmlFor="username" className="form-label">
 							Operator ID
 						</label>
 						<input
@@ -133,43 +110,14 @@ export default function Login() {
 							id="username"
 							value={username}
 							onChange={(e) => setUsername(e.target.value)}
-							placeholder="Enter operator code (e.g. admin)"
+							placeholder="e.g. admin"
 							autoFocus
-							style={{
-								width: "100%",
-								background: "rgba(0, 0, 0, 0.4)",
-								border: "1px solid var(--glass-border)",
-								borderRadius: "4px",
-								padding: "0.75rem 1rem",
-								color: "var(--text-primary)",
-								fontFamily: "var(--font-mono)",
-								fontSize: "0.9rem",
-								outline: "none",
-								transition: "border-color 0.2s, box-shadow 0.2s",
-							}}
-							onFocus={(e) => {
-								e.target.style.borderColor = "var(--accent-cyan)";
-								e.target.style.boxShadow = "0 0 10px rgba(0, 229, 255, 0.15)";
-							}}
-							onBlur={(e) => {
-								e.target.style.borderColor = "var(--glass-border)";
-								e.target.style.boxShadow = "none";
-							}}
+							className="form-input"
 						/>
 					</div>
 
-					<div style={{ textAlign: "left" }}>
-						<label
-							htmlFor="password"
-							style={{
-								display: "block",
-								fontSize: "0.75rem",
-								color: "var(--text-secondary)",
-								fontFamily: "var(--font-mono)",
-								textTransform: "uppercase",
-								marginBottom: "0.5rem",
-							}}
-						>
+					<div className="form-group">
+						<label htmlFor="password" className="form-label">
 							Security Token
 						</label>
 						<input
@@ -178,72 +126,23 @@ export default function Login() {
 							value={password}
 							onChange={(e) => setPassword(e.target.value)}
 							placeholder="••••••••"
-							style={{
-								width: "100%",
-								background: "rgba(0, 0, 0, 0.4)",
-								border: "1px solid var(--glass-border)",
-								borderRadius: "4px",
-								padding: "0.75rem 1rem",
-								color: "var(--text-primary)",
-								fontFamily: "var(--font-mono)",
-								fontSize: "0.9rem",
-								outline: "none",
-								transition: "border-color 0.2s, box-shadow 0.2s",
-							}}
-							onFocus={(e) => {
-								e.target.style.borderColor = "var(--accent-cyan)";
-								e.target.style.boxShadow = "0 0 10px rgba(0, 229, 255, 0.15)";
-							}}
-							onBlur={(e) => {
-								e.target.style.borderColor = "var(--glass-border)";
-								e.target.style.boxShadow = "none";
-							}}
+							className="form-input"
 						/>
 					</div>
 
 					<button
 						type="submit"
 						disabled={isSubmitting}
+						className="btn btn-primary"
 						style={{
-							marginTop: "1rem",
-							background: "transparent",
-							color: "var(--accent-cyan)",
-							border: "1px solid var(--accent-cyan)",
-							padding: "0.8rem",
-							borderRadius: "4px",
-							fontSize: "0.9rem",
-							fontFamily: "var(--font-mono)",
-							fontWeight: "bold",
-							textTransform: "uppercase",
-							cursor: "pointer",
-							transition: "all 0.2s",
-							boxShadow: "0 0 10px rgba(0, 229, 255, 0.05)",
-						}}
-						onMouseEnter={(e) => {
-							if (!isSubmitting) {
-								e.target.style.background = "var(--accent-cyan)";
-								e.target.style.color = "var(--bg-void)";
-								e.target.style.boxShadow = "0 0 15px rgba(0, 229, 255, 0.3)";
-							}
-						}}
-						onMouseLeave={(e) => {
-							if (!isSubmitting) {
-								e.target.style.background = "transparent";
-								e.target.style.color = "var(--accent-cyan)";
-								e.target.style.boxShadow = "0 0 10px rgba(0, 229, 255, 0.05)";
-							}
+							marginTop: "0.75rem",
+							width: "100%",
+							height: "2.75rem",
 						}}
 					>
-						{isSubmitting ? "AUTHORIZING ACCESS..." : "ESTABLISH SESSION"}
+						{isSubmitting ? "Establishing Session..." : "Sign In"}
 					</button>
 				</form>
-
-				<style>{`
-					@keyframes pulse {
-						0%, 100% { opacity: 0.6; transform: scale(1); }
-						50% { opacity: 1; transform: scale(1.1); box-shadow: 0 0 15px var(--accent-cyan); }
-					}
-				`}</style>
 			</div>
 		</div>
 	);

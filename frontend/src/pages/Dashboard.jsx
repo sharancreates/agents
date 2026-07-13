@@ -5,28 +5,37 @@ export default function Dashboard() {
 	const { submissions, isLoading, error } = useSubmissions();
 
 	return (
-		<div style={{ maxWidth: "1200px", margin: "0 auto", width: "100%" }}>
+		<div style={{ width: "100%" }}>
 			<header
 				style={{
 					display: "flex",
 					justifyContent: "space-between",
-					alignItems: "flex-end",
+					alignItems: "center",
 					marginBottom: "2rem",
+					borderBottom: "1px solid var(--border-subtle)",
+					paddingBottom: "1.25rem",
 				}}
 			>
 				<div>
-					<h1 style={{ marginBottom: "0.5rem" }}>Evaluation Queue</h1>
-					<p style={{ color: "var(--text-secondary)" }}>
+					<h1>Evaluation Queue</h1>
+					<p style={{ marginTop: "0.25rem" }}>
 						Monitor automated agent analysis in real-time.
 					</p>
 				</div>
 				<div
 					style={{
-						fontFamily: "var(--font-mono)",
-						color: "var(--accent-cyan)",
+						fontSize: "0.875rem",
+						color: "var(--text-secondary)",
+						backgroundColor: "var(--bg-element)",
+						padding: "0.35rem 0.75rem",
+						borderRadius: "var(--radius-sm)",
+						border: "1px solid var(--border-subtle)",
 					}}
 				>
-					Total Submissions: {submissions.length}
+					<span style={{ color: "var(--text-tertiary)" }}>Total Submissions: </span>
+					<span style={{ fontFamily: "var(--mono)", fontWeight: 500, color: "var(--text-primary)" }}>
+						{submissions.length}
+					</span>
 				</div>
 			</header>
 
@@ -34,41 +43,45 @@ export default function Dashboard() {
 			{isLoading && (
 				<div
 					style={{
-						textAlign: "center",
-						padding: "4rem",
+						display: "flex",
+						flexDirection: "column",
+						alignItems: "center",
+						justifyContent: "center",
+						padding: "6rem 2rem",
 						color: "var(--text-secondary)",
-						fontFamily: "var(--font-mono)",
 					}}
 				>
 					<div
+						className="animate-spin"
 						style={{
-							display: "inline-block",
-							width: "20px",
-							height: "20px",
-							border: "2px solid var(--accent-cyan)",
-							borderTopColor: "transparent",
+							width: "24px",
+							height: "24px",
+							border: "2px solid var(--border-muted)",
+							borderTopColor: "var(--accent)",
 							borderRadius: "50%",
-							animation: "spin 1s linear infinite",
 							marginBottom: "1rem",
 						}}
 					></div>
-					<p>Fetching queue data...</p>
-					<style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+					<p style={{ fontFamily: "var(--mono)", fontSize: "0.8rem" }}>
+						Fetching queue data...
+					</p>
 				</div>
 			)}
 
 			{/* Handle Error State */}
 			{error && (
 				<div
-					className="glass-panel"
+					className="card"
 					style={{
-						border: "1px solid var(--accent-red)",
-						padding: "2rem",
-						textAlign: "center",
-						color: "var(--accent-red)",
+						borderLeft: "4px solid var(--status-failed)",
+						padding: "1.5rem",
+						color: "var(--status-failed)",
+						background: "var(--status-failed-bg)",
 					}}
 				>
-					<p>SYSTEM ERROR: {error}</p>
+					<p style={{ fontFamily: "var(--mono)", fontWeight: 500 }}>
+						SYSTEM ERROR: {error}
+					</p>
 				</div>
 			)}
 

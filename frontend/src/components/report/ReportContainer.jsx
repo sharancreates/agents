@@ -2,14 +2,7 @@ import DimensionScore from "./DimensionScore";
 
 export default function ReportContainer({ submission }) {
 	return (
-		<div
-			style={{
-				display: "grid",
-				gridTemplateColumns: "1fr 1fr",
-				gap: "2rem",
-				marginTop: "2rem",
-			}}
-		>
+		<div className="details-grid">
 			{/* Left Column: Code Analysis */}
 			<div
 				style={{
@@ -20,10 +13,12 @@ export default function ReportContainer({ submission }) {
 			>
 				<h2
 					style={{
-						fontSize: "1.2rem",
-						color: "var(--text-secondary)",
-						borderBottom: "1px solid var(--glass-border)",
-						paddingBottom: "0.5rem",
+						fontSize: "1.1rem",
+						fontWeight: 600,
+						color: "var(--text-primary)",
+						borderBottom: "1px solid var(--border-subtle)",
+						paddingBottom: "0.75rem",
+						marginBottom: "0.25rem",
 					}}
 				>
 					Static & Dynamic Analysis
@@ -48,10 +43,12 @@ export default function ReportContainer({ submission }) {
 			>
 				<h2
 					style={{
-						fontSize: "1.2rem",
-						color: "var(--text-secondary)",
-						borderBottom: "1px solid var(--glass-border)",
-						paddingBottom: "0.5rem",
+						fontSize: "1.1rem",
+						fontWeight: 600,
+						color: "var(--text-primary)",
+						borderBottom: "1px solid var(--border-subtle)",
+						paddingBottom: "0.75rem",
+						marginBottom: "0.25rem",
 					}}
 				>
 					Originality & Innovation

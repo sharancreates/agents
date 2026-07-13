@@ -1,66 +1,47 @@
 export default function StatusIndicator({ status }) {
-	const getStatusConfig = (currentStatus) => {
+	const getBadgeClass = (currentStatus) => {
 		switch (currentStatus) {
 			case "complete":
-				return {
-					color: "var(--accent-green)",
-					label: "Complete",
-					bg: "rgba(57, 255, 20, 0.1)",
-				};
+				return "badge badge-complete";
 			case "running":
-				return {
-					color: "var(--accent-cyan)",
-					label: "Running",
-					bg: "rgba(0, 229, 255, 0.1)",
-				};
+				return "badge badge-running";
 			case "failed":
-				return {
-					color: "var(--accent-red)",
-					label: "Failed",
-					bg: "rgba(255, 0, 85, 0.1)",
-				};
+				return "badge badge-failed";
 			case "pending":
 			default:
-				return {
-					color: "var(--text-secondary)",
-					label: "Pending",
-					bg: "rgba(138, 143, 152, 0.1)",
-				};
+				return "badge badge-pending";
 		}
 	};
 
-	const config = getStatusConfig(status);
+	const getLabel = (currentStatus) => {
+		switch (currentStatus) {
+			case "complete":
+				return "Complete";
+			case "running":
+				return "Running";
+			case "failed":
+				return "Failed";
+			case "pending":
+			default:
+				return "Pending";
+		}
+	};
 
 	return (
-		<span
-			style={{
-				backgroundColor: config.bg,
-				color: config.color,
-				border: `1px solid ${config.color}`,
-				padding: "0.25rem 0.75rem",
-				borderRadius: "20px",
-				fontSize: "0.75rem",
-				fontWeight: 600,
-				fontFamily: "var(--font-mono)",
-				textTransform: "uppercase",
-				display: "inline-flex",
-				alignItems: "center",
-				gap: "0.5rem",
-			}}
-		>
-			{/* Optional: Add a pulsing dot for the 'running' state */}
+		<span className={getBadgeClass(status)}>
 			{status === "running" && (
 				<span
+					className="animate-pulse"
 					style={{
-						width: "6px",
-						height: "6px",
-						backgroundColor: config.color,
+						width: "5px",
+						height: "5px",
+						backgroundColor: "var(--status-running)",
 						borderRadius: "50%",
-						boxShadow: `0 0 5px ${config.color}`,
+						display: "inline-block",
 					}}
 				></span>
 			)}
-			{config.label}
+			{getLabel(status)}
 		</span>
 	);
 }

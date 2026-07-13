@@ -1,130 +1,123 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 
 export default function TopNavigationBar() {
 	const { user, logout } = useAuth();
+	const location = useLocation();
+
+	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit"));
+	const isSubmitActive = location.pathname === "/submit";
 
 	return (
 		<header
-			className="glass-panel"
 			style={{
-				margin: "1rem 2rem",
-				padding: "1rem 2rem",
-				display: "flex",
-				justifyContent: "space-between",
-				alignItems: "center",
 				position: "sticky",
-				top: "1rem",
+				top: 0,
 				zIndex: 100,
+				backgroundColor: "rgba(9, 9, 11, 0.75)",
+				backdropFilter: "blur(12px)",
+				WebkitBackdropFilter: "blur(12px)",
+				borderBottom: "1px solid var(--border-subtle)",
+				width: "100%",
+				marginBottom: "2rem",
 			}}
 		>
-			<div style={{ display: "flex", alignItems: "center", gap: "3rem" }}>
-				{/* Logo Section */}
-				<div
-					style={{
-						display: "flex",
-						alignItems: "center",
-						gap: "0.5rem",
-					}}
-				>
-					<div
-						style={{
-							width: "12px",
-							height: "12px",
-							background: "var(--accent-cyan)",
-							borderRadius: "50%",
-							boxShadow: "0 0 10px var(--accent-cyan)",
-						}}
-					></div>
-					<strong
-						style={{
-							fontSize: "1.25rem",
-							letterSpacing: "1px",
-							textTransform: "uppercase",
-						}}
-					>
-						Auto
-						<span style={{ color: "var(--accent-cyan)" }}>
-							Judge
-						</span>
-					</strong>
-				</div>
-
-				{/* Navigation Links */}
-				<nav style={{ display: "flex", gap: "2rem" }}>
-					<Link
-						to="/"
-						style={{
-							color: "var(--text-secondary)",
-							textDecoration: "none",
-							fontWeight: 600,
-							transition: "color 0.2s",
-						}}
-						onMouseEnter={(e) =>
-							(e.target.style.color = "var(--text-primary)")
-						}
-						onMouseLeave={(e) =>
-							(e.target.style.color = "var(--text-secondary)")
-						}
-					>
-						Submissions
-					</Link>
-					<Link
-						to="#"
-						style={{
-							color: "var(--text-secondary)",
-							textDecoration: "none",
-							fontWeight: 600,
-							transition: "color 0.2s",
-						}}
-					>
-						Leaderboard
-					</Link>
-				</nav>
-			</div>
-
-			{/* User & Auth Actions */}
 			<div
+				className="container"
 				style={{
 					display: "flex",
+					justifyContent: "space-between",
 					alignItems: "center",
-					gap: "1.5rem",
-					fontFamily: "var(--font-mono)",
+					height: "3.75rem",
 				}}
 			>
-				<span
-					style={{
-						color: "var(--text-secondary)",
-						fontSize: "0.85rem",
-					}}
-				>
-					ID: {user?.name.toUpperCase()}
-				</span>
-				<button
-					onClick={logout}
-					style={{
-						background: "transparent",
-						color: "var(--accent-red)",
-						border: "1px solid var(--accent-red)",
-						padding: "0.4rem 1rem",
-						borderRadius: "4px",
-						cursor: "pointer",
-						fontFamily: "var(--font-mono)",
-						textTransform: "uppercase",
-						fontSize: "0.8rem",
-						transition: "all 0.2s",
-					}}
-					onMouseEnter={(e) => {
-						e.target.style.background = "var(--accent-red)";
-						e.target.style.color = "var(--bg-void)";
-					}}
-					onMouseLeave={(e) => {
-						e.target.style.background = "transparent";
-						e.target.style.color = "var(--accent-red)";
-					}}
-				>
-					Terminate Session
-				</button>
+				<div style={{ display: "flex", alignItems: "center", gap: "2.5rem" }}>
+					{/* Logo Section */}
+					<Link to="/" style={{ display: "flex", alignItems: "center", gap: "0.5rem", color: "inherit" }}>
+						<div
+							style={{
+								width: "8px",
+								height: "8px",
+								background: "var(--accent)",
+								borderRadius: "50%",
+								boxShadow: "0 0 10px rgba(99, 102, 241, 0.5)",
+							}}
+						></div>
+						<strong
+							style={{
+								fontSize: "0.95rem",
+								fontWeight: 600,
+								letterSpacing: "-0.01em",
+							}}
+						>
+							AutoJudge
+						</strong>
+					</Link>
+
+					{/* Navigation Links */}
+					<nav style={{ display: "flex", gap: "1.5rem" }}>
+						<Link
+							to="/"
+							style={{
+								color: isSubmissionsActive ? "var(--text-primary)" : "var(--text-secondary)",
+								fontSize: "0.875rem",
+								fontWeight: 500,
+								transition: "color var(--transition)",
+							}}
+						>
+							Submissions
+						</Link>
+						<Link
+							to="/submit"
+							style={{
+								color: isSubmitActive ? "var(--text-primary)" : "var(--text-secondary)",
+								fontSize: "0.875rem",
+								fontWeight: 500,
+								transition: "color var(--transition)",
+							}}
+						>
+							Submit Entry
+						</Link>
+						<Link
+							to="#"
+							style={{
+								color: "var(--text-tertiary)",
+								fontSize: "0.875rem",
+								fontWeight: 500,
+								cursor: "not-allowed",
+							}}
+							onClick={(e) => e.preventDefault()}
+						>
+							Leaderboard
+						</Link>
+					</nav>
+				</div>
+
+				{/* User & Auth Actions */}
+				<div style={{ display: "flex", alignItems: "center", gap: "1.25rem" }}>
+					<span
+						style={{
+							color: "var(--text-secondary)",
+							fontSize: "0.8rem",
+							fontFamily: "var(--mono)",
+							borderRight: "1px solid var(--border-subtle)",
+							paddingRight: "1.25rem",
+						}}
+					>
+						operator://{user?.name.toLowerCase()}
+					</span>
+					<button
+						onClick={logout}
+						className="btn btn-secondary"
+						style={{
+							padding: "0.35rem 0.75rem",
+							fontSize: "0.75rem",
+							fontWeight: 500,
+						}}
+					>
+						Sign Out
+					</button>
+				</div>
 			</div>
 		</header>
 	);
