@@ -11,25 +11,12 @@ export default function MainLayout() {
 	}
 
 	return (
-		<div
-			style={{
-				minHeight: "100vh",
-				display: "flex",
-				flexDirection: "column",
-			}}
-		>
+		<div className="app-container">
 			{/* Our newly modularized navigation bar */}
 			<TopNavigationBar />
 
 			{/* Main Content Area where child routes will render */}
-			<main
-				style={{
-					padding: "0 2rem 2rem 2rem",
-					flex: 1,
-					display: "flex",
-					flexDirection: "column",
-				}}
-			>
+			<main className="container" style={{ flex: 1, paddingBottom: "3rem" }}>
 				<Outlet />
 			</main>
 		</div>

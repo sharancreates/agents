@@ -48,7 +48,7 @@ export const fetchSubmissionById = async (id) => {
 		if (submission) {
 			return submission;
 		} else {
-			throw new Error("Submission not found");
+			throw new Error("Submission not found", { cause: err });
 		}
 	}
 };

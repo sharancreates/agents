@@ -16,12 +16,11 @@ export default function RawJsonDebugger({ data }) {
 
 	return (
 		<div
-			className="glass-panel"
+			className="card"
 			style={{
 				marginTop: "2rem",
-				border: "1px solid var(--glass-border)",
+				padding: 0,
 				overflow: "hidden",
-				transition: "max-height 0.3s ease-in-out",
 			}}
 		>
 			{/* Panel Header */}
@@ -30,9 +29,9 @@ export default function RawJsonDebugger({ data }) {
 					display: "flex",
 					justifyContent: "space-between",
 					alignItems: "center",
-					padding: "1rem 1.5rem",
-					background: "rgba(255, 255, 255, 0.03)",
-					borderBottom: "1px solid var(--glass-border)",
+					padding: "0.85rem 1.25rem",
+					background: "rgba(255, 255, 255, 0.01)",
+					borderBottom: isOpen ? "1px solid var(--border-subtle)" : "none",
 					cursor: "pointer",
 					userSelect: "none",
 				}}
@@ -41,61 +40,46 @@ export default function RawJsonDebugger({ data }) {
 				<div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
 					<span
 						style={{
-							color: "var(--accent-cyan)",
-							fontFamily: "var(--font-mono)",
-							fontSize: "0.9rem",
-							fontWeight: "bold",
+							color: "var(--text-tertiary)",
+							fontFamily: "var(--mono)",
+							fontSize: "0.8rem",
+							fontWeight: 600,
 						}}
 					>
 						[DEBUG]
 					</span>
-					<span style={{ fontWeight: 600, fontSize: "0.95rem" }}>
+					<span style={{ fontWeight: 500, fontSize: "0.875rem", color: "var(--text-secondary)" }}>
 						Raw Agent Output Schema
 					</span>
 				</div>
 
 				<div
-					style={{ display: "flex", alignItems: "center", gap: "1rem" }}
+					style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}
 					onClick={(e) => e.stopPropagation()} // Prevent collapse when clicking buttons
 				>
 					<button
 						onClick={handleCopy}
+						className="btn btn-secondary"
 						style={{
-							background: "transparent",
-							border: "1px solid var(--glass-border)",
-							color: copied ? "var(--accent-green)" : "var(--text-secondary)",
-							padding: "0.3rem 0.75rem",
-							borderRadius: "4px",
+							padding: "0.25rem 0.6rem",
 							fontSize: "0.75rem",
-							fontFamily: "var(--font-mono)",
-							cursor: "pointer",
-							transition: "all 0.2s",
-						}}
-						onMouseEnter={(e) => {
-							e.target.style.borderColor = copied
-								? "var(--accent-green)"
-								: "var(--accent-cyan)";
-							e.target.style.color = copied
-								? "var(--accent-green)"
-								: "var(--text-primary)";
-						}}
-						onMouseLeave={(e) => {
-							e.target.style.borderColor = "var(--glass-border)";
-							e.target.style.color = copied
-								? "var(--accent-green)"
-								: "var(--text-secondary)";
+							fontWeight: 500,
+							color: copied ? "var(--status-complete)" : "var(--text-secondary)",
+							borderColor: copied ? "var(--status-complete-border)" : "var(--border-subtle)",
+							backgroundColor: copied ? "var(--status-complete-bg)" : "transparent",
 						}}
 					>
-						{copied ? "✓ COPIED" : "COPY JSON"}
+						{copied ? "✓ Copied" : "Copy JSON"}
 					</button>
 
 					<span
 						style={{
-							color: "var(--text-secondary)",
-							fontSize: "0.8rem",
+							color: "var(--text-tertiary)",
+							fontSize: "0.75rem",
 							transform: isOpen ? "rotate(0deg)" : "rotate(180deg)",
-							transition: "transform 0.2s",
+							transition: "transform var(--transition)",
 							cursor: "pointer",
+							padding: "0.25rem",
 						}}
 						onClick={() => setIsOpen(!isOpen)}
 					>
@@ -106,17 +90,17 @@ export default function RawJsonDebugger({ data }) {
 
 			{/* JSON Preformatted Block */}
 			{isOpen && (
-				<div style={{ padding: "1.5rem", background: "rgba(0, 0, 0, 0.4)" }}>
+				<div style={{ padding: "1.25rem", background: "var(--bg-page)" }}>
 					<pre
 						style={{
 							margin: 0,
 							whiteSpace: "pre-wrap",
 							wordBreak: "break-all",
-							fontFamily: "var(--font-mono)",
-							fontSize: "0.85rem",
+							fontFamily: "var(--mono)",
+							fontSize: "0.8125rem",
 							lineHeight: "1.5",
-							color: "#a9b2c3",
-							maxHeight: "450px",
+							color: "var(--text-secondary)",
+							maxHeight: "350px",
 							overflowY: "auto",
 							textAlign: "left",
 						}}
