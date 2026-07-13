@@ -256,6 +256,75 @@ class DatabaseManager:
             logger.error(f"[DB] Failed to execute similarity query: {e}")
             raise
 
+    @classmethod
+    def query_similar_functions_advanced(
+        cls,
+        query_embedding: list,
+        limit: int = 5,
+        metric: str = "cosine",
+        min_similarity: float = None,
+        exclude_file_paths: list = None,
+        exclude_signatures: list = None
+    ) -> list:
+        """
+        Executes high-precision similarity search with advanced filtering options
+        (distance threshold filters, file exclusions, and signature exclusions).
+        """
+        # Determine operator and distance computation
+        if metric == "cosine":
+            operator = "<=>"
+            dist_expr = "embedding <=> %s"
+            sim_expr = "1.0 - (embedding <=> %s)"
+        elif metric == "inner_product":
+            operator = "<#>"
+            dist_expr = "embedding <#> %s"
+            sim_expr = "-(embedding <#> %s)"
+        elif metric == "l2":
+            operator = "<->"
+            dist_expr = "embedding <-> %s"
+            sim_expr = "-(embedding <-> %s)"
+        else:
+            raise ValueError("Unsupported metric. Choose 'cosine', 'inner_product', or 'l2'.")
+
+        query = f"""
+        SELECT 
+            id,
+            file_path,
+            function_name,
+            signature,
+            cleaned_source,
+            ({dist_expr}) AS raw_distance,
+            ({sim_expr}) AS similarity_score
+        FROM originality_embeddings
+        WHERE 1=1
+        """
+        
+        params = [query_embedding, query_embedding]
+        
+        if exclude_file_paths:
+            query += " AND file_path != ALL(%s)"
+            params.append(exclude_file_paths)
+            
+        if exclude_signatures:
+            query += " AND signature != ALL(%s)"
+            params.append(exclude_signatures)
+            
+        if min_similarity is not None:
+            query += f" AND ({sim_expr}) >= %s"
+            params.extend([query_embedding, min_similarity])
+            
+        query += f" ORDER BY embedding {operator} %s LIMIT %s;"
+        params.extend([query_embedding, limit])
+
+        try:
+            with cls.get_cursor(cursor_factory=RealDictCursor) as cursor:
+                cursor.execute(query, tuple(params))
+                results = cursor.fetchall()
+                return results
+        except Exception as e:
+            logger.error(f"[DB] Failed to execute advanced similarity query: {e}")
+            raise
+
 # --- Self-Test & Usage Harness ---
 if __name__ == "__main__":
     # Test setting up schema and performing insert/query with 3D mock vectors
