@@ -4,17 +4,25 @@ import { createContext, useState, useContext } from "react";
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-	// Simulating a logged-in state.
-	// Change this to 'null' if you want to test the logged-out view first!
-	const [user, setUser] = useState({ name: "Demo Judge", role: "admin" });
+	// Dynamic session check from localStorage
+	const [user, setUser] = useState(() => {
+		const saved = localStorage.getItem("operator_user");
+		try {
+			return saved ? JSON.parse(saved) : null;
+		} catch {
+			return null;
+		}
+	});
 
-	const login = () => {
-		// In Week 4, this will be replaced with real JWT logic
-		setUser({ name: "Demo Judge", role: "admin" });
+	const login = (username) => {
+		const sessionUser = { name: username || "operator", role: "admin" };
+		setUser(sessionUser);
+		localStorage.setItem("operator_user", JSON.stringify(sessionUser));
 	};
 
 	const logout = () => {
 		setUser(null);
+		localStorage.removeItem("operator_user");
 	};
 
 	return (

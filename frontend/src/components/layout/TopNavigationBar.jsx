@@ -5,7 +5,8 @@ export default function TopNavigationBar() {
 	const { user, logout } = useAuth();
 	const location = useLocation();
 
-	const isSubmissionsActive = location.pathname === "/" || location.pathname.startsWith("/submission");
+	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit"));
+	const isSubmitActive = location.pathname === "/submit";
 
 	return (
 		<header
@@ -65,6 +66,17 @@ export default function TopNavigationBar() {
 							}}
 						>
 							Submissions
+						</Link>
+						<Link
+							to="/submit"
+							style={{
+								color: isSubmitActive ? "var(--text-primary)" : "var(--text-secondary)",
+								fontSize: "0.875rem",
+								fontWeight: 500,
+								transition: "color var(--transition)",
+							}}
+						>
+							Submit Entry
 						</Link>
 						<Link
 							to="#"

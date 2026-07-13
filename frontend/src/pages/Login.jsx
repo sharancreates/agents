@@ -21,7 +21,7 @@ export default function Login() {
 				setError("Invalid credentials. Operator code and token cannot be blank.");
 				setIsSubmitting(false);
 			} else {
-				login();
+				login(username);
 				navigate("/");
 			}
 		}, 800);
