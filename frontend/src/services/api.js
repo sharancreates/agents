@@ -1,3 +1,6 @@
+import rawSubmissions from "../mockData/submissions.json";
+import { calculateSynthesisScore, generateSynthesisSummary } from "../utils/synthesisAgent";
+
 // The base URL for Person 1's FastAPI orchestrator
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
 
@@ -11,21 +14,15 @@ const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
  */
 const getLocalSubmissions = () => {
 	const saved = localStorage.getItem("autojudge_submissions");
-	if (!saved) {
-		localStorage.setItem("autojudge_submissions", JSON.stringify([]));
-		return [];
+	if (!saved || saved === "[]") {
+		localStorage.setItem("autojudge_submissions", JSON.stringify(rawSubmissions));
+		return rawSubmissions;
 	}
 	try {
-		const parsed = JSON.parse(saved);
-		// Auto-migration: Clear out old hardcoded mock data if present
-		if (Array.isArray(parsed) && parsed.some((s) => s.team_name === "Neon Syndicate")) {
-			localStorage.setItem("autojudge_submissions", JSON.stringify([]));
-			return [];
-		}
-		return parsed;
+		return JSON.parse(saved);
 	} catch (err) {
 		console.warn("Failed to parse submissions from local storage, falling back", err);
-		return [];
+		return rawSubmissions;
 	}
 };
 
@@ -135,6 +132,8 @@ const simulatePipelineRun = (id) => {
 				error_message: null
 			};
 			sub.pipeline_status = "complete";
+			sub.overall_score = calculateSynthesisScore(sub);
+			sub.synthesis_summary = generateSynthesisSummary(sub);
 			return sub;
 		});
 	}, 14000);

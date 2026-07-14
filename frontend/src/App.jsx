@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import SubmissionDetail from "./pages/SubmissionDetail";
 import Submit from "./pages/Submit";
 import Login from "./pages/Login";
+import Leaderboard from "./pages/Leaderboard";
 
 function App() {
 	return (
@@ -16,6 +17,7 @@ function App() {
 					<Route element={<MainLayout />}>
 						<Route path="/" element={<Dashboard />} />
 						<Route path="/submit" element={<Submit />} />
+						<Route path="/leaderboard" element={<Leaderboard />} />
 						<Route
 							path="/submission/:id"
 							element={<SubmissionDetail />}
