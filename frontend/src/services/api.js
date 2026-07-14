@@ -162,7 +162,7 @@ export const fetchSubmissions = async () => {
 export const fetchSubmissionById = async (id) => {
 	try {
 		// Attempting P1's status detail endpoint
-		const response = await fetch(`${API_BASE_URL}/submissions/${id}/status`);
+		const response = await fetch(`${API_BASE_URL}/submissions/${id}`);
 		if (!response.ok) {
 			throw new Error(`API Error: ${response.status} ${response.statusText}`);
 		}
@@ -182,6 +182,25 @@ export const fetchSubmissionById = async (id) => {
 		} else {
 			throw new Error("Submission not found", { cause: err });
 		}
+	}
+};
+
+export const updateWeightsOnBackend = async (weights) => {
+	try {
+		const response = await fetch(`${API_BASE_URL}/submissions/recalculate-all-synthesis`, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify(weights),
+		});
+		if (!response.ok) {
+			throw new Error(`API Error: ${response.status} ${response.statusText}`);
+		}
+		const data = await response.json();
+		console.log("Successfully recalculated all synthesis scores on backend", data);
+		return data;
+	} catch (err) {
+		console.warn("FastAPI backend connection failed. Rubric weights saved locally only.", err.message);
+		return null;
 	}
 };
 

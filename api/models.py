@@ -1,10 +1,32 @@
-from sqlalchemy import Column, Integer, String
+import datetime
+from sqlalchemy import Column, Integer, String, Float, Boolean, JSON, DateTime
 from api.database import Base
 
 class Submission(Base):
     __tablename__ = "submissions"
 
     id = Column(Integer, primary_key=True, index=True)
-    url = Column(String, index=True)
-    status = Column(String, default="pending")
-    primary_language = Column(String, nullable=True)
+    submission_id = Column(String, unique=True, index=True)
+    team_name = Column(String, index=True, nullable=True)
+    repo_url = Column(String, index=True)
+    commit_sha = Column(String, nullable=True)
+    pipeline_status = Column(String, default="pending")  # 'pending', 'running', 'complete', 'failed'
+    
+    pipeline_started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    pipeline_completed_at = Column(DateTime, nullable=True)
+    
+    overall_score = Column(Float, nullable=True)
+    synthesis_summary = Column(String, nullable=True)
+    
+    requires_manual_review = Column(Boolean, default=False)
+    review_status = Column(String, default="unreviewed")  # 'unreviewed', 'in_review', 'approved', 'rejected'
+    reviewed_by = Column(String, nullable=True)
+    
+    # Store dimensions as JSON fields conforming to schema
+    code_quality = Column(JSON, nullable=True)
+    functionality = Column(JSON, nullable=True)
+    originality = Column(JSON, nullable=True)
+    innovation = Column(JSON, nullable=True)
+    
+    # Store custom weight configurations used at calculation time
+    rubric_weights = Column(JSON, nullable=True)

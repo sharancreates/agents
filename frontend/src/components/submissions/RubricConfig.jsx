@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { getStoredWeights, calculateSynthesisScore } from "../../utils/synthesisAgent";
+import { updateWeightsOnBackend } from "../../services/api";
 
 export default function RubricConfig({ submissions, onWeightsChange }) {
 	const [weights, setWeights] = useState(getStoredWeights());
@@ -66,24 +67,11 @@ export default function RubricConfig({ submissions, onWeightsChange }) {
 		setWeights(defaults);
 	};
 
-	const saveToStorage = () => {
+	const saveToStorage = async () => {
 		localStorage.setItem("autojudge_rubric_weights", JSON.stringify(weights));
 		
-		// Force updates across any other tabs or components by updating submissions overall score
-		const saved = localStorage.getItem("autojudge_submissions");
-		if (saved) {
-			try {
-				const subs = JSON.parse(saved);
-				const updated = subs.map(sub => {
-					if (sub.pipeline_status === "complete") {
-						// We'll update the stored scores with new weights
-						const { calculateSynthesisScore, generateSynthesisSummary } = require("../../utils/synthesisAgent");
-						// In React we can't dynamic require easily, but we imported them. We will recalculate overall_score dynamically or when they save
-					}
-					return sub;
-				});
-			} catch (e) {}
-		}
+		// Update weights and scores on the database backend
+		await updateWeightsOnBackend(weights);
 		
 		alert("Rubric configuration updated and saved successfully!");
 	};
