@@ -136,7 +136,8 @@ class ArchitectureEvaluator:
     def evaluate_repository(cls, directory_path: str) -> dict:
         """
         Gathers structural details of the directory, builds the context payload,
-        sends it to Claude via the Anthropic API, and returns the evaluation profile.
+        sends it to Claude via the Anthropic API with structured tool parameters,
+        validates the output using Pydantic schemas, and returns the profile.
         """
         dir_path = Path(directory_path).resolve()
         logger.info(f"Gathering repository metadata for path: {dir_path}")
@@ -164,9 +165,48 @@ class ArchitectureEvaluator:
         # Load API key
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         
+        # Structural tool schema
+        tool_schema = {
+            "name": "record_architecture_evaluation",
+            "description": "Records the structured architectural evaluation parameters of a software repository.",
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "detected_patterns": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Design patterns detected in the workspace layout (e.g. MVC, Monolith, Pipeline)."
+                    },
+                    "manifest_mismatches": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Listing discrepancies between import structures and package manifests."
+                    },
+                    "readme_authenticity": {
+                        "type": "string",
+                        "description": "Detailed analysis of whether the README describes the actual code structure accurately."
+                    },
+                    "scores": {
+                        "type": "object",
+                        "properties": {
+                            "design_integrity": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                            "structural_novelty": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                            "readme_consistency": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                        },
+                        "required": ["design_integrity", "structural_novelty", "readme_consistency"]
+                    },
+                    "critique_summary": {
+                        "type": "string",
+                        "description": "Full systems architecture critique and design feedback."
+                    }
+                },
+                "required": ["detected_patterns", "manifest_mismatches", "readme_authenticity", "scores", "critique_summary"]
+            }
+        }
+        
         if has_anthropic and api_key:
             try:
-                logger.info("Connecting to Anthropic API using Claude...")
+                logger.info("Connecting to Anthropic API using Claude with structured tool schemas...")
                 client = Anthropic(api_key=api_key)
                 
                 message = client.messages.create(
@@ -175,15 +215,41 @@ class ArchitectureEvaluator:
                     system=SYSTEM_PROMPT,
                     messages=[
                         {"role": "user", "content": user_content}
-                    ]
+                    ],
+                    tools=[tool_schema],
+                    tool_choice={"type": "tool", "name": "record_architecture_evaluation"}
                 )
                 
-                # Parse response text to dict
-                response_text = message.content[0].text.strip()
-                return json.loads(response_text)
+                # Extract tool call arguments
+                tool_use = None
+                for content in message.content:
+                    if content.type == "tool_use":
+                        tool_use = content
+                        break
+                        
+                if not tool_use:
+                    raise ValueError("Claude response did not contain the forced tool use structure.")
+                    
+                raw_arguments = tool_use.input
+                logger.info("Validating Claude structured output parameters...")
+                
+                try:
+                    from originality.schemas import ArchitectureEvaluationSchema, has_pydantic
+                except ImportError:
+                    from schemas import ArchitectureEvaluationSchema, has_pydantic
+                    
+                if has_pydantic:
+                    validated = ArchitectureEvaluationSchema(**raw_arguments)
+                    return validated.dict()
+                else:
+                    required_keys = ["detected_patterns", "manifest_mismatches", "readme_authenticity", "scores", "critique_summary"]
+                    for k in required_keys:
+                        if k not in raw_arguments:
+                            raise ValueError(f"Schema mismatch: missing key '{k}' in response.")
+                    return raw_arguments
                 
             except Exception as e:
-                logger.error(f"Anthropic API call failed: {e}. Falling back to simulation.")
+                logger.error(f"Structured evaluation query failed: {e}. Falling back to simulation.")
         
         # Fallback simulation/mock response
         logger.info("Running in SIMULATION mode (mock evaluation return).")
@@ -211,6 +277,20 @@ class ArchitectureEvaluator:
           },
           "critique_summary": "Simulated output. Connect to Anthropic API to retrieve real Claude metrics."
         }
+        
+        # Validate simulation response against schema
+        try:
+            from originality.schemas import ArchitectureEvaluationSchema, has_pydantic
+        except ImportError:
+            from schemas import ArchitectureEvaluationSchema, has_pydantic
+            
+        if has_pydantic:
+            try:
+                ArchitectureEvaluationSchema(**simulated_response)
+                logger.info("Simulated payload successfully verified against Pydantic schema.")
+            except Exception as val_err:
+                logger.warning(f"Simulated payload schema validation failure: {val_err}")
+                
         return simulated_response
 
 if __name__ == "__main__":
