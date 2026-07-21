@@ -6,10 +6,10 @@ import logging
 
 logger = logging.getLogger("CommentNeutralizer")
 
-# Patterns targeting Devanagari, Gujarati, and general non-ASCII characters
-NON_ASCII_PATTERN = re.compile(r"[^\x00-\x7F]+")
-
 class CommentNeutralizer:
+    # Patterns targeting Devanagari, Gujarati, and general non-ASCII characters
+    NON_ASCII_PATTERN = re.compile(r"[^\x00-\x7F]+")
+
     @classmethod
     def neutralize_source_code(cls, source_code: str) -> str:
         """
@@ -52,7 +52,7 @@ class CommentNeutralizer:
             # Perform neutralization
             if tok_type == tokenize.COMMENT:
                 # If comment contains non-ASCII characters (e.g. Hindi, Gujarati)
-                if NON_ASCII_PATTERN.search(tok_string):
+                if cls.NON_ASCII_PATTERN.search(tok_string):
                     tok_string = "#"  # Replace with a blank placeholder
             elif tok_type == tokenize.STRING:
                 # Identify if token is a docstring (multi-line triple quotes)
@@ -62,7 +62,7 @@ class CommentNeutralizer:
                     tok_string.startswith('r"""') or
                     tok_string.startswith("r'''")
                 )
-                if is_docstring and NON_ASCII_PATTERN.search(tok_string):
+                if is_docstring and cls.NON_ASCII_PATTERN.search(tok_string):
                     tok_string = '""" neutralized docstring """'
                     
             out.append(tok_string)
@@ -82,7 +82,7 @@ class CommentNeutralizer:
             if "#" in line:
                 parts = line.split("#", 1)
                 comment = parts[1]
-                if NON_ASCII_PATTERN.search(comment):
+                if cls.NON_ASCII_PATTERN.search(comment):
                     # Replace comment segment
                     line = parts[0] + "#"
             cleaned.append(line)
