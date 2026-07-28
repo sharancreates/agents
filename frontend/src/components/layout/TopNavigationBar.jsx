@@ -5,8 +5,9 @@ export default function TopNavigationBar() {
 	const { user, logout } = useAuth();
 	const location = useLocation();
 
-	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit"));
+	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit") && !location.pathname.includes("/leaderboard"));
 	const isSubmitActive = location.pathname === "/submit";
+	const isLeaderboardActive = location.pathname === "/leaderboard";
 
 	return (
 		<header
@@ -79,14 +80,13 @@ export default function TopNavigationBar() {
 							Submit Entry
 						</Link>
 						<Link
-							to="#"
+							to="/leaderboard"
 							style={{
-								color: "var(--text-tertiary)",
+								color: isLeaderboardActive ? "var(--text-primary)" : "var(--text-secondary)",
 								fontSize: "0.875rem",
 								fontWeight: 500,
-								cursor: "not-allowed",
+								transition: "color var(--transition)",
 							}}
-							onClick={(e) => e.preventDefault()}
 						>
 							Leaderboard
 						</Link>
