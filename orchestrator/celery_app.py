@@ -5,6 +5,7 @@ from celery import Celery
 from api.database import SessionLocal
 from api import models
 from api.synthesis_service import calculate_synthesis_score, generate_synthesis_summary, get_default_weights
+from api.feedback_service import generate_participant_feedback
 
 # Connects to the Redis container running locally
 celery_app = Celery(
@@ -145,6 +146,10 @@ def process_submission_task(db_submission_id: int, url: str):
         
         sub.overall_score = calculate_synthesis_score(sub_data, weights)
         sub.synthesis_summary = generate_synthesis_summary(sub_data, weights)
+        
+        # --- Stage 6: Participant Feedback Generation ---
+        sub.participant_feedback = generate_participant_feedback(sub_data)
+        
         sub.pipeline_completed_at = datetime.datetime.utcnow()
         sub.pipeline_status = "complete"
         db.commit()

@@ -1,5 +1,6 @@
 import rawSubmissions from "../mockData/submissions.json";
 import { calculateSynthesisScore, generateSynthesisSummary } from "../utils/synthesisAgent";
+import { generateParticipantFeedback } from "../utils/feedbackAgent";
 
 // The base URL for Person 1's FastAPI orchestrator
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
@@ -134,6 +135,7 @@ const simulatePipelineRun = (id) => {
 			sub.pipeline_status = "complete";
 			sub.overall_score = calculateSynthesisScore(sub);
 			sub.synthesis_summary = generateSynthesisSummary(sub);
+			sub.participant_feedback = generateParticipantFeedback(sub);
 			return sub;
 		});
 	}, 14000);
@@ -281,5 +283,20 @@ export const submitRepository = async (payload) => {
 		simulatePipelineRun(newSub.submission_id);
 
 		return newSub;
+	}
+};
+
+export const fetchParticipantFeedback = async (submissionId) => {
+	try {
+		const response = await fetch(`${API_BASE_URL}/submissions/${submissionId}/feedback`);
+		if (!response.ok) {
+			throw new Error(`API Error: ${response.status} ${response.statusText}`);
+		}
+		const data = await response.json();
+		return data;
+	} catch (err) {
+		console.warn(`FastAPI backend feedback call failed for ${submissionId}, computing locally.`, err.message);
+		const sub = await fetchSubmissionById(submissionId);
+		return generateParticipantFeedback(sub);
 	}
 };

@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from api.database import SessionLocal, engine
 from api import models
 from api.synthesis_service import calculate_synthesis_score, generate_synthesis_summary, get_default_weights
+from api.feedback_service import generate_participant_feedback
 from orchestrator.celery_app import process_submission_task
 
 # Create the database tables automatically on startup
@@ -92,7 +93,8 @@ def seed_database():
                 functionality=item.get("functionality"),
                 originality=item.get("originality"),
                 innovation=item.get("innovation"),
-                rubric_weights=get_default_weights()
+                rubric_weights=get_default_weights(),
+                participant_feedback=item.get("participant_feedback") or generate_participant_feedback(item)
             )
             db.add(sub)
         db.commit()
@@ -129,7 +131,8 @@ def get_submissions(db: Session = Depends(get_db)):
             "code_quality": s.code_quality,
             "functionality": s.functionality,
             "originality": s.originality,
-            "innovation": s.innovation
+            "innovation": s.innovation,
+            "participant_feedback": s.participant_feedback
         })
     return result
 
@@ -152,7 +155,8 @@ def get_submission_detail(submission_id: str, db: Session = Depends(get_db)):
         "code_quality": s.code_quality,
         "functionality": s.functionality,
         "originality": s.originality,
-        "innovation": s.innovation
+        "innovation": s.innovation,
+        "participant_feedback": s.participant_feedback
     }
 
 @app.post("/api/submissions")
@@ -269,3 +273,39 @@ def recalculate_all_synthesis(weights: BulkSynthesisRequest, db: Session = Depen
         
     db.commit()
     return {"message": f"Successfully recalculated {len(updated_subs)} submissions.", "updates": updated_subs}
+
+@app.get("/api/submissions/{submission_id}/feedback")
+def get_participant_feedback_endpoint(submission_id: str, db: Session = Depends(get_db)):
+    s = db.query(models.Submission).filter(models.Submission.submission_id == submission_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+        
+    if not s.participant_feedback:
+        sub_data = {
+            "team_name": s.team_name,
+            "code_quality": s.code_quality,
+            "functionality": s.functionality,
+            "originality": s.originality,
+            "innovation": s.innovation
+        }
+        s.participant_feedback = generate_participant_feedback(sub_data)
+        db.commit()
+        
+    return s.participant_feedback
+
+@app.post("/api/submissions/{submission_id}/feedback")
+def generate_feedback_endpoint(submission_id: str, db: Session = Depends(get_db)):
+    s = db.query(models.Submission).filter(models.Submission.submission_id == submission_id).first()
+    if not s:
+        raise HTTPException(status_code=404, detail="Submission not found")
+        
+    sub_data = {
+        "team_name": s.team_name,
+        "code_quality": s.code_quality,
+        "functionality": s.functionality,
+        "originality": s.originality,
+        "innovation": s.innovation
+    }
+    s.participant_feedback = generate_participant_feedback(sub_data)
+    db.commit()
+    return s.participant_feedback
