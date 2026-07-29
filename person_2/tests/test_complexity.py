@@ -7,7 +7,7 @@ def simple_add(a, b):
     return a + b
 """
     calculator = CyclomaticComplexityCalculator()
-    score = calculator.calculate_complexity(code, language="python")
+    score = calculator.calculate_complexity(code, "python")
     assert score >= 1
 
 def test_cyclomatic_complexity_branching():
@@ -21,5 +21,5 @@ def check_value(x):
         return "low"
 """
     calculator = CyclomaticComplexityCalculator()
-    score = calculator.calculate_complexity(code, language="python")
+    score = calculator.calculate_complexity(code, "python")
     assert score >= 3

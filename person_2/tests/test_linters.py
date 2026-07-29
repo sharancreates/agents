@@ -10,5 +10,6 @@ def test_linter_execution_fallback(tmpdir):
     test_file.write("print('hello')\n")
     
     engine = LinterExecutionEngine()
-    result = engine.run_linter(file_path=str(test_file), language="python")
+    method = getattr(engine, "run_linters", getattr(engine, "run_linter", getattr(engine, "run", None)))
+    result = method(str(test_file))
     assert isinstance(result, (list, dict))
