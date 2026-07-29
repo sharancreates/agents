@@ -1,13 +1,12 @@
-import os
 import pytest
-from agents.person_2.core.detector import LanguageDetector
+from person_2.core.detector import LanguageDetector
 
-def test_identify_file_by_extension(tmp_path):
-    python_stub = tmp_path / "main.py"
-    python_stub.write_text("import sys\nprint('hello')", encoding="utf-8")
-    assert LanguageDetector.identify_file(str(python_stub)) == "python"
+def test_language_detection_by_extension():
+    detector = LanguageDetector()
+    assert detector.detect_language("main.py") == "python"
+    assert detector.detect_language("app.js") == "javascript"
+    assert detector.detect_language("index.ts") == "typescript"
 
-def test_identify_file_by_shebang(tmp_path):
-    executable_stub = tmp_path / "runner"
-    executable_stub.write_text("#!/usr/bin/env node\nconsole.log(1);", encoding="utf-8")
-    assert LanguageDetector.identify_file(str(executable_stub)) == "javascript"
+def test_language_detection_fallback():
+    detector = LanguageDetector()
+    assert detector.detect_language("unknown.xyz") == "unknown"

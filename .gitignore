@@ -2,3 +2,9 @@
 __pycache__/
 *.pyc
 
+
+__pycache__/
+*.pyc
+person_2/agent_storage.db
+person_2/exports/*.json
+
