@@ -3,10 +3,10 @@ from person_2.core.detector import LanguageDetector
 
 def test_language_detection_by_extension():
     detector = LanguageDetector()
-    assert detector.detect_language("main.py") == "python"
-    assert detector.detect_language("app.js") == "javascript"
-    assert detector.detect_language("index.ts") == "typescript"
+    assert detector.detect("main.py") == "python"
+    assert detector.detect("app.js") == "javascript"
+    assert detector.detect("index.ts") == "typescript"
 
 def test_language_detection_fallback():
     detector = LanguageDetector()
-    assert detector.detect_language("unknown.xyz") == "unknown"
+    assert detector.detect("unknown.xyz") == "unknown"
