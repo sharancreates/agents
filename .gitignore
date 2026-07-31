@@ -1,10 +1,18 @@
-
+# Bytecode & Caches
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-
-__pycache__/
-*.pyc
+# Local Database & Output Artifacts
 person_2/agent_storage.db
 person_2/exports/*.json
+*.db
+*.sqlite3
 
+# Environment & IDE
+.env
+.venv/
+env/
+.vscode/
+.idea/
