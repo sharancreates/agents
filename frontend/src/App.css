@@ -1,0 +1,42 @@
+/* App-specific Layouts */
+.app-container {
+	min-height: 100vh;
+	display: flex;
+	flex-direction: column;
+	background-image: radial-gradient(
+		circle at 50% 0%,
+		rgba(99, 102, 241, 0.04) 0%,
+		transparent 60%
+	);
+}
+
+/* Spacing and alignments */
+.header-actions {
+	display: flex;
+	align-items: center;
+	gap: 1rem;
+}
+
+.table-header {
+	display: grid;
+	padding: 0.75rem 1.5rem;
+	font-size: 0.75rem;
+	font-weight: 500;
+	color: var(--text-tertiary);
+	text-transform: uppercase;
+	letter-spacing: 0.05em;
+	border-bottom: 1px solid var(--border-subtle);
+}
+
+.details-grid {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 2rem;
+	margin-top: 1.5rem;
+}
+
+@media (max-width: 768px) {
+	.details-grid {
+		grid-template-columns: 1fr;
+	}
+}
