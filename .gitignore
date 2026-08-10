@@ -216,3 +216,23 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+=======
+# Bytecode & Caches
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Local Database & Output Artifacts
+person_2/agent_storage.db
+person_2/exports/*.json
+*.db
+*.sqlite3
+
+# Environment & IDE
+.env
+.venv/
+env/
+.vscode/
+.idea/
+
