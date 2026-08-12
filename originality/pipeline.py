@@ -238,8 +238,8 @@ def process_codebase_pipeline(directory_path: str, model_name: str = "all-MiniLM
             stats["files_scanned"] += 1
             file_path = os.path.join(root, file)
             
-            # We only index Python source files
-            if not file.endswith(".py"):
+            # Index Python, JavaScript, and TypeScript source files
+            if not file.endswith((".py", ".js", ".jsx", ".ts", ".tsx")):
                 stats["files_skipped"] += 1
                 continue
                 

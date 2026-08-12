@@ -15,6 +15,12 @@ def main():
         default=".", 
         help="Target directory path to evaluate (defaults to current directory)."
     )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", 8001)),
+        help="Optional server port (defaults to PORT env or 8001)."
+    )
     
     args = parser.parse_args()
     target_path = os.path.abspath(args.path)
