@@ -132,13 +132,18 @@ class DynamicExecutionRunner:
                         case_peak_memory = mem
                     time.sleep(0.005)
 
-                # Read outputs safely
-                stdout, stderr = proc.communicate()
+                # Read outputs safely after process exit
+                stdout_data = proc.stdout.read() if proc.stdout else ""
+                stderr_data = proc.stderr.read() if proc.stderr else ""
+                proc.stdout.close()
+                proc.stderr.close()
+                proc.wait()
+
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
-                observed = stdout.strip() if stdout else ""
+                observed = stdout_data.strip() if stdout_data else ""
                 
                 if proc.returncode != 0:
-                    err_msg = stderr.strip() if stderr else f"Process exited with non-zero code: {proc.returncode}"
+                    err_msg = stderr_data.strip() if stderr_data else f"Process exited with non-zero code: {proc.returncode}"
                 elif observed == tc.expected_output.strip():
                     passed = True
                     passed_count += 1
@@ -148,8 +153,8 @@ class DynamicExecutionRunner:
                 err_msg = f"TIMEOUT_FAILURE: Execution exceeded maximum runtime limit of {config.timeout_seconds}s."
                 if proc:
                     proc.kill()
-                    stdout, stderr = proc.communicate()
-                    observed = stdout.strip() if stdout else ""
+                    stdout_data = proc.stdout.read() if proc.stdout else ""
+                    observed = stdout_data.strip() if stdout_data else ""
             except Exception as e:
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
                 err_msg = f"SYSTEM_CRASH: {str(e)}"

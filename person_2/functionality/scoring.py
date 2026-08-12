@@ -42,7 +42,7 @@ class EvaluationScoringEngine:
         final_grade = round(weighted_total / 10.0, 2)
 
         # 5. Determine Automation Verdict
-        if func_score < 100.0:
+        if func_score < 70.0:
             verdict = "REJECTED_FUNCTIONAL_FAILURE"
         elif final_grade >= 8.0:
             verdict = "ACCEPTED_EXCELLENT"

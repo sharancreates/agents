@@ -1,6 +1,17 @@
 import re
 from typing import Any, List
 
+def _get_node_prop(node: Any, key: str, default: Any = None) -> Any:
+    if hasattr(node, "get"):
+        return node.get(key, default)
+    if isinstance(node, dict):
+        return node.get(key, default)
+    if hasattr(node, "_metrics"):
+        metrics = getattr(node, "_metrics")
+        if isinstance(metrics, dict):
+            return metrics.get(key, default)
+    return default
+
 class CyclomaticComplexityCalculator:
     # Tree-sitter node type names that represent decision-making points in Python paths 
     PYTHON_BRANCH_NODES = {
@@ -21,21 +32,22 @@ class CyclomaticComplexityCalculator:
         if not root_node:
             return 1
 
+        node_lang = _get_node_prop(root_node, "language")
+        raw_content = _get_node_prop(root_node, "raw_content")
+
         # Check if root_node is our mock adapter wrapping JavaScript/TypeScript metrics
-        if hasattr(root_node, "_metrics") and root_node["language"] in ("javascript", "typescript"):
-            content = root_node["raw_content"]
-            # Regex to find decision branches in JS/TS: keywords or logical operators
-            js_branches = len(re.findall(r'\b(if|while|for|catch)\b|&&|\|\|', content))
+        if node_lang in ("javascript", "typescript") and raw_content is not None:
+            js_branches = len(re.findall(r'\b(if|while|for|catch)\b|&&|\|\|', raw_content))
             return js_branches + 1
 
         # Fallback to linear execution value if unmapped non-Python sources are supplied
-        if str(language).lower() != "python":
+        target_lang = str(language or node_lang or "python").lower()
+        if target_lang != "python":
             return 1
 
         # Fallback for Python if root_node is wrapped in our adapter dict object
-        if hasattr(root_node, "_metrics") and root_node["language"] == "python":
-            content = root_node["raw_content"]
-            py_branches = len(re.findall(r'\b(if|while|for|except)\b|and|or', content))
+        if node_lang == "python" and raw_content is not None:
+            py_branches = len(re.findall(r'\b(if|while|for|except)\b|and|or', raw_content))
             return py_branches + 1
 
         # Standard tree-sitter node fallback path processing
@@ -61,9 +73,5 @@ class CyclomaticComplexityCalculator:
         """
         Backward compatibility alias mapping single-argument calls to calculate_complexity.
         """
-        # Deduce the structural target language from the node context where available
-        language = "python"
-        if hasattr(root_node, "_metrics"):
-            language = root_node["language"]
-            
+        language = _get_node_prop(root_node, "language", "python")
         return cls.calculate_complexity(language, root_node)

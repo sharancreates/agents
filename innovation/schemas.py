@@ -1,19 +1,16 @@
 from typing import List
 
-# Pluggable Pydantic checking
 try:
     from pydantic import BaseModel, Field, ValidationError
     has_pydantic = True
 except ImportError:
     has_pydantic = False
-    
-    # Safe fallback classes for environment compatibility
-    class BaseModel:
+
+    class _FallbackBaseModel:
         def __init__(self, **kwargs):
             for k, v in kwargs.items():
                 setattr(self, k, v)
         def dict(self):
-            # Return attributes as dictionary
             d = {}
             for k, v in self.__dict__.items():
                 if hasattr(v, "dict"):
@@ -21,10 +18,12 @@ except ImportError:
                 else:
                     d[k] = v
             return d
-    
+
+    BaseModel = _FallbackBaseModel
+
     def Field(*args, **kwargs):
         return None
-        
+
     class ValidationError(Exception):
         pass
 
@@ -71,7 +70,6 @@ if has_pydantic:
             description="Full systems architecture critique and design feedback."
         )
 else:
-    # Dummy empty wrappers
     class ScoresSchema(BaseModel):
         pass
     class ArchitectureEvaluationSchema(BaseModel):
