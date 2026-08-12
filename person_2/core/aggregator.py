@@ -37,17 +37,17 @@ class MetricsAggregator:
             for file in files:
                 file_path = os.path.join(root, file)
                 
-                # Check absolute variations of what your Day 1 class provides
-                if hasattr(detector, 'detect_language'):
+                # Check absolute variations of what LanguageDetector provides
+                if hasattr(detector, 'identify_file'):
+                    lang = detector.identify_file(file_path)
+                elif hasattr(detector, 'detect_language'):
                     lang = detector.detect_language(file_path)
                 elif hasattr(detector, 'detect'):
                     lang = detector.detect(file_path)
-                elif hasattr(LanguageDetector, 'detect_language'):
-                    lang = LanguageDetector.detect_language(file_path)
-                elif hasattr(LanguageDetector, 'detect'):
-                    lang = LanguageDetector.detect(file_path)
+                elif hasattr(LanguageDetector, 'identify_file'):
+                    lang = LanguageDetector.identify_file(file_path)
                 else:
-                    # Fallback default extension deduction if your Day 1 class names don't match
+                    # Fallback default extension deduction
                     ext = os.path.splitext(file_path)[1]
                     lang = "python" if ext == ".py" else "javascript" if ext in (".js", ".ts") else "unknown"
                 
@@ -99,3 +99,29 @@ class MetricsAggregator:
                 report["summary"]["overall_maintainability_rating"] = "HIGH"
 
         return report
+
+    def __init__(self, repo_path: str = "."):
+        self.repo_path = repo_path
+
+    def run_all_checks(self) -> Dict[str, Any]:
+        report = self.evaluate_directory(self.repo_path)
+        summary_data = report.get("summary", {})
+        metrics_data = report.get("metrics", {})
+        
+        rating = summary_data.get("overall_maintainability_rating", "HIGH")
+        issues = summary_data.get("global_issue_count", 0)
+        
+        base_score = 95.0 if rating == "HIGH" else (75.0 if rating == "MEDIUM_RISK" else 45.0)
+        score = max(0.0, round(base_score - min(issues * 2, 40), 2))
+        
+        return {
+            "score": score,
+            "summary": f"Evaluated {summary_data.get('total_files_evaluated', 0)} files. Maintainability: {rating}. Issues detected: {issues}.",
+            "flags": [{"level": "warning", "message": f"Found {issues} code quality/linter issues."}] if issues > 0 else [],
+            "raw_metrics": {
+                "total_files": summary_data.get("total_files_evaluated", 0),
+                "avg_complexity": metrics_data.get("average_cyclomatic_complexity", 1.0),
+                "max_complexity": metrics_data.get("max_complexity_observed", 1),
+                "global_issue_count": issues
+            }
+        }
