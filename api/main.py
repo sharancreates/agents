@@ -19,10 +19,15 @@ models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Hackathon Evaluation Pipeline")
 
-# Enable CORS for frontend communication
+# Enable CORS for frontend communication with explicit origins for credentials support
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,8 +109,10 @@ def seed_database():
     finally:
         db.close()
 
-# Run seed on import / startup
-seed_database()
+# Run seed on application startup (not on module import)
+@app.on_event("startup")
+def startup_event():
+    seed_database()
 
 @app.get("/health")
 def health_check():
