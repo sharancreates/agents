@@ -164,12 +164,14 @@ class CodeSmellDetector:
                     })
 
         elif lang == "python":
-            if "except:" in content or "except Exception:" in content:
+            match = re.search(r'\bexcept\s*:', content)
+            if match:
+                line_no = content[:match.start()].count("\n") + 1
                 smells.append({
                     "type": "CODE_SMELL",
                     "rule": "Bare Except Clause",
                     "severity": "WARNING",
-                    "line": 1,
+                    "line": line_no,
                     "message": "Flagged empty or bare except catch-block. Masking runtime exceptions degrades safety."
                 })
 

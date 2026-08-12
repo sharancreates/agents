@@ -71,9 +71,9 @@ def seed_database():
                 try:
                     start_dt = datetime.datetime.fromisoformat(submitted_at.replace("Z", "+00:00"))
                 except ValueError:
-                    start_dt = datetime.datetime.utcnow()
+                    start_dt = datetime.datetime.now(datetime.timezone.utc)
             else:
-                start_dt = datetime.datetime.utcnow()
+                start_dt = datetime.datetime.now(datetime.timezone.utc)
                 
             completed_dt = start_dt if item.get("pipeline_status") == "complete" else None
             
@@ -161,7 +161,13 @@ def get_submission_detail(submission_id: str, db: Session = Depends(get_db)):
 
 @app.post("/api/submissions")
 def create_submission(request: SubmissionRequest, db: Session = Depends(get_db)):
-    sub_id = f"sub_{db.query(models.Submission).count() + 1:03d}"
+    max_id_row = db.query(models.Submission.id).order_by(models.Submission.id.desc()).first()
+    next_num = (max_id_row[0] + 1) if max_id_row else (db.query(models.Submission).count() + 1)
+    sub_id = f"sub_{next_num:03d}"
+    while db.query(models.Submission).filter(models.Submission.submission_id == sub_id).first():
+        next_num += 1
+        sub_id = f"sub_{next_num:03d}"
+
     commit_sha = str(uuid.uuid4()).replace("-", "")[:40]
     
     # Initialize JSON components with pending state
@@ -180,7 +186,7 @@ def create_submission(request: SubmissionRequest, db: Session = Depends(get_db))
         repo_url=request.repo_url,
         commit_sha=commit_sha,
         pipeline_status="pending",
-        pipeline_started_at=datetime.datetime.utcnow(),
+        pipeline_started_at=datetime.datetime.now(datetime.timezone.utc),
         code_quality=pending_dim,
         functionality={**pending_dim, "raw_metrics": {"tests_passed": 0, "total_tests": 0, "avg_runtime_ms": 0, "peak_memory_mb": 0}},
         originality=pending_dim,

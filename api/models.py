@@ -12,7 +12,7 @@ class Submission(Base):
     commit_sha = Column(String, nullable=True)
     pipeline_status = Column(String, default="pending")  # 'pending', 'running', 'complete', 'failed'
     
-    pipeline_started_at = Column(DateTime, default=datetime.datetime.utcnow)
+    pipeline_started_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
     pipeline_completed_at = Column(DateTime, nullable=True)
     
     overall_score = Column(Float, nullable=True)

@@ -46,7 +46,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": None,
             "summary": "Analyzing repository AST and running static linters...",
             "flags": [],
-            "started_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "completed_at": None,
             "raw_metrics": {}
         }
@@ -63,7 +63,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": quality_report.get("score"),
             "summary": quality_report.get("summary", "Static code analysis completed successfully."),
             "flags": quality_report.get("flags", []),
-            "completed_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "completed_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "raw_metrics": quality_report.get("raw_metrics", {})
         })
         sub.code_quality = cq_dict
@@ -76,7 +76,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": None,
             "summary": "Executing dynamic test suite and resource profiling...",
             "flags": [],
-            "started_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "completed_at": None,
             "raw_metrics": {}
         }
@@ -106,7 +106,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": grade.score_20,
             "summary": f"Passed {report.passed_count}/{report.total_count} tests in {report.total_duration_ms:.2f}ms.",
             "flags": grade.flags,
-            "completed_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "completed_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "raw_metrics": {
                 "tests_passed": report.passed_count,
                 "total_tests": report.total_count,
@@ -124,7 +124,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": None,
             "summary": "Analyzing AST fingerprinting and code similarity...",
             "flags": [],
-            "started_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "completed_at": None,
             "raw_metrics": {}
         }
@@ -135,7 +135,7 @@ def process_submission_task(db_submission_id: int, url: str):
             "score": None,
             "summary": "Evaluating architectural design and technical innovation...",
             "flags": [],
-            "started_at": datetime.datetime.utcnow().isoformat() + "Z",
+            "started_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
             "completed_at": None,
             "raw_metrics": {}
         }
@@ -174,7 +174,7 @@ def process_submission_task(db_submission_id: int, url: str):
                 "score": orig_score,
                 "summary": f"Originality scan verdict: {eval_matrix.get('verdict', 'PASSED')}. Max similarity ratio: {sim_ratio * 100:.1f}%.",
                 "flags": [],
-                "completed_at": datetime.datetime.utcnow().isoformat() + "Z",
+                "completed_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
                 "raw_metrics": {
                     "similarity_ratio": sim_ratio,
                     "verdict": eval_matrix.get("verdict", "PASSED")
@@ -195,7 +195,7 @@ def process_submission_task(db_submission_id: int, url: str):
                 "score": innov_score,
                 "summary": f"Architecture evaluated. Design integrity: {design_int*100:.0f}%, Novelty: {struct_nov*100:.0f}%.",
                 "flags": [],
-                "completed_at": datetime.datetime.utcnow().isoformat() + "Z",
+                "completed_at": datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z",
                 "raw_metrics": {
                     "design_integrity": design_int,
                     "structural_novelty": struct_nov,
@@ -206,7 +206,7 @@ def process_submission_task(db_submission_id: int, url: str):
             flag_modified(sub, "innovation")
             db.commit()
         except Exception:
-            now_iso = datetime.datetime.utcnow().isoformat() + "Z"
+            now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
             orig_dict = dict(sub.originality or {})
             orig_dict.update({
                 "status": "complete",

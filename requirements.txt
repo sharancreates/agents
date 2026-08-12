@@ -4,3 +4,10 @@ sqlalchemy
 psycopg2-binary
 celery
 redis
+pydantic
+python-dotenv
+pgvector
+sentence-transformers
+pytest
+ruff
+tomli; python_version < "3.11"
