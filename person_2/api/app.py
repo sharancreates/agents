@@ -2,7 +2,11 @@ import os
 import sys
 import uuid
 import json
-from datetime import datetime, UTC
+from datetime import datetime, timezone
+try:
+    from datetime import UTC
+except ImportError:
+    UTC = timezone.utc
 from typing import Dict, Any
 from fastapi import FastAPI, HTTPException, status, BackgroundTasks
 
