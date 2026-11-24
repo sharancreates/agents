@@ -8,6 +8,9 @@ pydantic
 python-dotenv
 pgvector
 sentence-transformers
+httpx
+psutil
+razorpay
 pytest
 ruff
 tomli; python_version < "3.11"
