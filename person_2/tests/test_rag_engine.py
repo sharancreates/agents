@@ -225,6 +225,16 @@ def test_sponsor_compliance_auditor():
     )
     assert gem_audit["is_compliant"] is False
 
+    # 3. Partial keyword match -> Non-compliant because all mandatory keywords are required
+    partial_audit = SponsorComplianceAuditor.audit_track(
+        db, submission_id,
+        track_name="Razorpay Strict Track",
+        query="Razorpay order payment checkout",
+        mandatory_keywords=["razorpay", "nonexistent_required_kw"],
+        min_threshold=0.40
+    )
+    assert partial_audit["is_compliant"] is False
+
     db.close()
 
 def test_judge_copilot_chat_api(client, seed_rag_submission):

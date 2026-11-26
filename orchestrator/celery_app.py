@@ -2,6 +2,10 @@ import time
 import datetime
 import os
 import logging
+import tempfile
+import subprocess
+import shutil
+import hashlib
 from celery import Celery
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -27,6 +31,7 @@ def process_submission_task(db_submission_id: int, url: str):
     """
     db = SessionLocal()
     sub = None
+    cloned_tmp_dir = None
     try:
         sub = db.query(models.Submission).filter(models.Submission.id == db_submission_id).first()
         if not sub:
@@ -36,8 +41,29 @@ def process_submission_task(db_submission_id: int, url: str):
         sub.pipeline_status = "running"
         db.commit()
 
-        # Target repo path: in local development defaults to '.', in cloud workers targets cloned repo
-        repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
+        # Target repo path: clone remote git repository or use verified directory
+        if url and (url.startswith("http://") or url.startswith("https://") or url.startswith("git@")):
+            cloned_tmp_dir = tempfile.TemporaryDirectory(prefix=f"eval_repo_{sub.submission_id}_")
+            try:
+                clone_res = subprocess.run(
+                    ["git", "clone", "--depth", "1", "--single-branch", url, cloned_tmp_dir.name],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=60.0
+                )
+                if clone_res.returncode == 0:
+                    repo_path = cloned_tmp_dir.name
+                else:
+                    logger.warning(f"Git clone failed for {url}: {clone_res.stderr}. Using fallback repo dir.")
+                    repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
+            except Exception as clone_err:
+                logger.warning(f"Error cloning repository {url}: {clone_err}. Using fallback.")
+                repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
+        elif url and os.path.isdir(url):
+            repo_path = url
+        else:
+            repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
 
         # Convene the Agentic Evaluation Council
         council_state = CouncilOrchestrator.evaluate(
@@ -144,9 +170,23 @@ def process_submission_task(db_submission_id: int, url: str):
         if sub.webhook_url:
             try:
                 from api.webhook_service import dispatch_webhook_event
+                # Retrieve specific signing secret registered for this endpoint
+                endpoint = db.query(models.WebhookEndpoint).filter(
+                    models.WebhookEndpoint.organization_id == sub.organization_id,
+                    models.WebhookEndpoint.url == sub.webhook_url,
+                    models.WebhookEndpoint.is_active == True
+                ).first()
+
+                if endpoint and endpoint.signing_secret:
+                    webhook_secret = endpoint.signing_secret
+                else:
+                    webhook_secret = hashlib.sha256(
+                        f"webhook_sec_{sub.organization_id}_{os.getenv('APP_SECRET', 'default_sec')}".encode()
+                    ).hexdigest()
+
                 dispatch_webhook_event(
                     webhook_url=sub.webhook_url,
-                    secret="autojudge_webhook_secret_key",
+                    secret=webhook_secret,
                     event_type="evaluation.completed",
                     data={
                         "evaluation_id": sub.submission_id,
@@ -172,6 +212,22 @@ def process_submission_task(db_submission_id: int, url: str):
         if sub:
             sub.pipeline_status = "failed"
             db.commit()
+            # Refund reserved credit on internal execution failure
+            if sub.organization_id:
+                try:
+                    account = db.query(models.OrganizationCredit).filter(
+                        models.OrganizationCredit.organization_id == sub.organization_id
+                    ).first()
+                    if account:
+                        account.balance += 1.0
+                        db.commit()
+                except Exception:
+                    pass
         return {"error": str(e), "submission_id": db_submission_id}
     finally:
+        if cloned_tmp_dir:
+            try:
+                cloned_tmp_dir.cleanup()
+            except Exception:
+                pass
         db.close()

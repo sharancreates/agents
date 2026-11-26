@@ -132,3 +132,50 @@ def test_webhook_signing_and_verification():
     old_timestamp = now - 400
     old_sig = generate_webhook_signature(secret, raw_payload, old_timestamp)
     assert verify_webhook_signature(secret, old_sig, raw_payload, tolerance_seconds=300) is False
+
+def test_api_key_scope_enforcement(test_client, seed_tenants):
+    """Asserts that requests lacking required scopes are rejected with HTTP 403 Forbidden."""
+    db = TestingSessionLocal()
+    # Create key with restricted scope (read-only)
+    read_only_key, _ = generate_api_key(
+        db, seed_tenants["org_a_id"], name="Read Only Key", scopes=["eval:read"]
+    )
+    db.close()
+
+    headers = {"Authorization": f"Bearer {read_only_key}"}
+
+    # 1. Accessing eval:read route succeeds
+    res_read = test_client.get("/v1/evaluations/sub_tenant_001", headers=headers)
+    assert res_read.status_code in (200, 404) # Valid scope reached controller
+
+    # 2. Accessing admin:keys route is rejected with 403
+    res_admin = test_client.get("/v1/api-keys", headers=headers)
+    assert res_admin.status_code == 403
+    assert "Forbidden" in res_admin.json()["detail"]
+
+    # 3. Accessing eval:write route is rejected with 403
+    res_write = test_client.post("/v1/evaluations", json={"repo_url": "https://github.com/test"}, headers=headers)
+    assert res_write.status_code == 403
+    assert "Forbidden" in res_write.json()["detail"]
+
+def test_webhook_ssrf_rejection(test_client, seed_tenants):
+    """Asserts that private, loopback, or cloud metadata webhook targets are blocked with HTTP 400."""
+    headers = {"Authorization": f"Bearer {seed_tenants['key_a']}"}
+
+    # 1. Loopback IP rejection
+    res1 = test_client.post(
+        "/v1/webhooks",
+        json={"url": "http://127.0.0.1:8000/callback", "secret": "sec123"},
+        headers=headers
+    )
+    assert res1.status_code == 400
+    assert "SSRF Protection" in res1.json()["detail"]
+
+    # 2. Localhost string rejection
+    res2 = test_client.post(
+        "/v1/webhooks",
+        json={"url": "http://localhost:5000/hook", "secret": "sec123"},
+        headers=headers
+    )
+    assert res2.status_code == 400
+    assert "SSRF Protection" in res2.json()["detail"]

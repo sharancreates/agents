@@ -225,7 +225,7 @@ def test_quota_admission_and_metered_deduction(client, seed_org):
     """Verifies that evaluations are admitted when credits exist and deductions update ledger."""
     headers = {"Authorization": f"Bearer {seed_org['api_key']}"}
 
-    # Org starts with 25 credits, evaluation is accepted (mock celery task delay)
+    # Org starts with 25 credits, evaluation is accepted and credit is reserved upfront
     with patch("api.v1_endpoints.process_submission_task.delay"):
         eval_resp = client.post(
             "/v1/evaluations",
@@ -235,13 +235,7 @@ def test_quota_admission_and_metered_deduction(client, seed_org):
     assert eval_resp.status_code == 202
     submission_id = eval_resp.json()["evaluation_id"]
 
-    # Trigger deduction as Celery worker does upon completion
-    db = TestingSessionLocal()
-    deducted = BillingService.deduct_credit(db, seed_org["org_id"], submission_id=submission_id, credits=1.0)
-    assert deducted is True
-    db.close()
-
-    # Check updated balance
+    # Check updated balance (atomically decremented to 24.0 upon evaluation admission)
     bal_resp = client.get("/v1/billing/balance", headers=headers)
     assert bal_resp.json()["balance"] == 24.0
     assert bal_resp.json()["total_consumed"] == 1.0

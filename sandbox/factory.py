@@ -27,6 +27,9 @@ def get_sandbox_provider(requested_provider: Optional[str] = None) -> BaseSandbo
             return docker_provider
         logger.warning("Docker provider requested but Docker daemon is unreachable. Falling back to safe fallback.")
 
+    if provider_name == "fallback":
+        return RestrictedFallbackProvider()
+
     # Auto resolution mode: try Docker -> E2B -> Fallback
     docker_provider = DockerSandboxProvider()
     if docker_provider.is_available():

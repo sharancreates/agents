@@ -8,9 +8,12 @@ from typing import Dict, Any, Optional
 
 logger = logging.getLogger("RazorpayClient")
 
+DEFAULT_SIMULATED_KEY_SECRET = "simulated_secret_key_12345"
+DEFAULT_SIMULATED_WEBHOOK_SECRET = "simulated_webhook_secret_67890"
+
 RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID", "rzp_test_simulated_key")
-RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", "simulated_secret_key_12345")
-RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "simulated_webhook_secret_67890")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", DEFAULT_SIMULATED_KEY_SECRET)
+RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", DEFAULT_SIMULATED_WEBHOOK_SECRET)
 
 def is_simulation_mode() -> bool:
     """Returns True if running with simulated/test credentials."""
@@ -20,12 +23,23 @@ def is_simulation_mode() -> bool:
         or os.getenv("RAZORPAY_SIMULATION", "true").lower() in ("true", "1", "yes")
     )
 
+def _resolve_secret(explicit_secret: Optional[str], env_var_name: str, simulated_default: str) -> str:
+    """Resolves secret, prohibiting default simulated secrets in production mode."""
+    secret = explicit_secret or os.getenv(env_var_name)
+    if is_simulation_mode():
+        return secret or simulated_default
+    if not secret:
+        raise ValueError(f"CRITICAL_SECURITY_ERROR: Production {env_var_name} must be set in environment.")
+    if secret == simulated_default:
+        raise ValueError(f"CRITICAL_SECURITY_ERROR: Default simulated secret for {env_var_name} is rejected in production mode.")
+    return secret
+
 def generate_payment_signature(order_id: str, payment_id: str, secret: Optional[str] = None) -> str:
     """
     Computes HMAC-SHA256 signature for Razorpay checkout verification.
     Formula: HMAC-SHA256(order_id + "|" + payment_id, secret)
     """
-    key_secret = secret or RAZORPAY_KEY_SECRET
+    key_secret = _resolve_secret(secret, "RAZORPAY_KEY_SECRET", DEFAULT_SIMULATED_KEY_SECRET)
     payload = f"{order_id}|{payment_id}".encode("utf-8")
     return hmac.new(key_secret.encode("utf-8"), payload, hashlib.sha256).hexdigest()
 
@@ -41,7 +55,7 @@ def verify_payment_signature(
     """
     if not order_id or not payment_id or not signature:
         return False
-    key_secret = secret or RAZORPAY_KEY_SECRET
+    key_secret = _resolve_secret(secret, "RAZORPAY_KEY_SECRET", DEFAULT_SIMULATED_KEY_SECRET)
     expected_sig = generate_payment_signature(order_id, payment_id, key_secret)
     return hmac.compare_digest(expected_sig, signature)
 
@@ -50,7 +64,7 @@ def generate_webhook_signature(raw_body: bytes, secret: Optional[str] = None) ->
     Computes HMAC-SHA256 signature for Razorpay webhook payloads.
     Formula: HMAC-SHA256(raw_body, webhook_secret)
     """
-    key_secret = secret or RAZORPAY_WEBHOOK_SECRET
+    key_secret = _resolve_secret(secret, "RAZORPAY_WEBHOOK_SECRET", DEFAULT_SIMULATED_WEBHOOK_SECRET)
     return hmac.new(key_secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
 
 def verify_webhook_signature(
@@ -63,7 +77,7 @@ def verify_webhook_signature(
     """
     if not raw_body or not signature:
         return False
-    key_secret = secret or RAZORPAY_WEBHOOK_SECRET
+    key_secret = _resolve_secret(secret, "RAZORPAY_WEBHOOK_SECRET", DEFAULT_SIMULATED_WEBHOOK_SECRET)
     expected_sig = generate_webhook_signature(raw_body, key_secret)
     return hmac.compare_digest(expected_sig, signature)
 

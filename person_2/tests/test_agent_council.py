@@ -73,6 +73,18 @@ def test_quality_agent_evaluation(sample_repo):
     assert qual_eval.score >= 50.0
     assert "total_files" in qual_eval.raw_metrics
 
+def test_quality_agent_conservative_on_analyzer_failure(sample_repo):
+    """Verifies that static analyzer failures score conservatively (40.0) with failure flags."""
+    from unittest.mock import patch
+    from person_2.core.aggregator import MetricsAggregator
+    state = CouncilState(submission_id="sub_test_qual_fail", repo_path=sample_repo)
+    with patch.object(MetricsAggregator, "evaluate_directory", side_effect=RuntimeError("AST Parser Crash")):
+        qual_eval = QualityAgent.evaluate_quality(state)
+        assert qual_eval.score == 40.0
+        assert "ANALYZER_FAILURE" in qual_eval.flags
+        assert "ANALYSIS_INCOMPLETE" in qual_eval.flags
+        assert qual_eval.raw_metrics["rating"] == "UNAVAILABLE"
+
 def test_forensics_agent_analysis(sample_repo):
     """Verifies that ForensicsAgent inspects version control signals and originality."""
     state = CouncilState(submission_id="sub_test_forensics", repo_path=sample_repo)

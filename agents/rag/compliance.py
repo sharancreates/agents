@@ -67,11 +67,11 @@ class SponsorComplianceAuditor:
 
         top_score = results[0]["score"]
 
-        # Keyword verification across retrieved chunks
+        # Keyword verification across retrieved chunks (all mandatory keywords must be present)
         keyword_match = True
         if mandatory_keywords:
             combined_text = " ".join([r["content"].lower() for r in results])
-            keyword_match = any(kw.lower() in combined_text for kw in mandatory_keywords)
+            keyword_match = all(kw.lower() in combined_text for kw in mandatory_keywords)
 
         is_compliant = (top_score >= min_threshold) and keyword_match
 

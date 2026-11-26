@@ -1,3 +1,4 @@
+import os
 import hmac
 import hashlib
 import secrets
@@ -11,8 +12,18 @@ from sqlalchemy.orm import Session
 from api.database import SessionLocal
 from api import models
 
-# In-memory sliding window rate limiter
+# In-memory sliding window rate limiter fallback
 _RATE_LIMIT_WINDOWS: Dict[int, collections.deque] = collections.defaultdict(collections.deque)
+
+# Redis client for distributed rate limiting across multiple workers/replicas
+_redis_client = None
+try:
+    import redis
+    _redis_url = os.getenv("REDIS_URL")
+    if _redis_url:
+        _redis_client = redis.from_url(_redis_url, socket_timeout=0.5, decode_responses=True)
+except Exception:
+    _redis_client = None
 
 TIER_LIMITS = {
     "free": 10,        # 10 requests per minute
@@ -52,7 +63,7 @@ def generate_api_key(
         name=name,
         key_prefix=prefix,
         key_hash=key_hash,
-        scopes=scopes or ["eval:read", "eval:write"],
+        scopes=scopes or ["eval:read", "eval:write", "billing:read", "billing:write", "webhooks:manage", "admin:keys"],
         is_active=True
     )
     db.add(api_key_record)
@@ -98,10 +109,36 @@ def verify_api_key(db: Session, plaintext_key: str) -> Optional[Tuple[models.Api
 def check_rate_limit(org_id: int, tier: str = "free") -> Tuple[bool, int, int]:
     """
     Sliding window rate limit check.
+    Uses distributed Redis sorted-sets when available; falls back to in-memory deque.
     Returns (is_limited, remaining_quota, reset_seconds).
     """
     limit = TIER_LIMITS.get(tier.lower(), 10)
     now = time.time()
+
+    # 1. Distributed Redis sliding window
+    if _redis_client is not None:
+        try:
+            key = f"ratelimit:org:{org_id}"
+            pipe = _redis_client.pipeline()
+            pipe.zremrangebyscore(key, 0, now - 60.0)
+            pipe.zcard(key)
+            results = pipe.execute()
+            current_count = results[1]
+
+            if current_count >= limit:
+                return True, 0, 60
+
+            pipe = _redis_client.pipeline()
+            pipe.zadd(key, {f"{now}:{secrets.token_hex(4)}": now})
+            pipe.expire(key, 120)
+            pipe.execute()
+
+            remaining = max(0, limit - current_count - 1)
+            return False, remaining, 60
+        except Exception:
+            pass  # Fall back to in-memory deque if Redis operation fails
+
+    # 2. In-memory deque fallback
     window = _RATE_LIMIT_WINDOWS[org_id]
 
     # Evict timestamps older than 60 seconds
@@ -115,6 +152,22 @@ def check_rate_limit(org_id: int, tier: str = "free") -> Tuple[bool, int, int]:
     window.append(now)
     remaining = max(0, limit - len(window))
     return False, remaining, 60
+
+def require_scope(required_scope: str):
+    """
+    FastAPI dependency checking that the authenticated API key contains
+    the necessary scope privilege or wildcard ('*', 'admin').
+    """
+    def _scope_guard(auth_ctx: Tuple[models.Organization, models.ApiKey] = Depends(get_current_org)):
+        org, key_record = auth_ctx
+        scopes = key_record.scopes or []
+        if "*" in scopes or "admin" in scopes or required_scope in scopes:
+            return auth_ctx
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden: API key lacks required scope '{required_scope}'."
+        )
+    return _scope_guard
 
 def get_current_org(
     authorization: Optional[str] = Header(None),

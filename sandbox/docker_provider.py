@@ -14,8 +14,8 @@ logger = logging.getLogger("DockerSandboxProvider")
 class DockerSandboxProvider(BaseSandboxProvider):
     """Executes code inside an ephemeral Docker container with strict Linux namespaces and cgroups."""
 
-    def __init__(self, default_image: str = "ubuntu:22.04"):
-        self.default_image = default_image
+    def __init__(self, default_image: Optional[str] = None):
+        self.default_image = default_image or os.getenv("SANDBOX_DOCKER_IMAGE", "python:3.10-slim")
         self._docker_bin = shutil.which("docker") or "docker"
 
     def is_available(self) -> bool:
@@ -65,7 +65,7 @@ class DockerSandboxProvider(BaseSandboxProvider):
             elif request.language in ("javascript", "js"):
                 cmd = ["node", f"/sandbox_env/{target_filename}"]
             elif request.language in ("typescript", "ts"):
-                cmd = ["node", f"/sandbox_env/{target_filename}"]
+                cmd = ["ts-node", f"/sandbox_env/{target_filename}"]
             else:
                 cmd = ["python3", "-u", f"/sandbox_env/{target_filename}"]
 
@@ -74,6 +74,11 @@ class DockerSandboxProvider(BaseSandboxProvider):
 
             docker_cmd = [
                 self._docker_bin, "run", "--rm", "-i",
+                "--read-only",
+                "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
+                "--cap-drop", "ALL",
+                "--security-opt", "no-new-privileges:true",
+                "--user", "1000:1000",
                 "--memory", f"{cfg.memory_limit_mb}m",
                 "--memory-swap", f"{cfg.memory_limit_mb}m",
                 "--cpus", str(cfg.cpu_limit),

@@ -25,11 +25,29 @@ class QualityAgent:
             report = MetricsAggregator.evaluate_directory(state.repo_path)
         except Exception as e:
             logger.warning(f"MetricsAggregator encountered issue: {e}")
-            report = {
-                "summary": {"total_files_evaluated": 0, "overall_maintainability_rating": "HIGH", "global_issue_count": 0},
-                "metrics": {"average_cyclomatic_complexity": 1.0, "max_complexity_observed": 1},
-                "file_breakdown": []
-            }
+            eval_result = DimensionEvaluation(
+                dimension="code_quality",
+                score=40.0,
+                summary=f"Code quality evaluation incomplete due to static analyzer exception: {str(e)}. Score assigned conservatively.",
+                flags=["ANALYZER_FAILURE", "ANALYSIS_INCOMPLETE"],
+                evidence_citations=[f"Static analysis exception: {str(e)}"],
+                raw_metrics={
+                    "total_files": 0,
+                    "global_issues": 0,
+                    "average_complexity": 0.0,
+                    "max_complexity": 0,
+                    "rating": "UNAVAILABLE",
+                    "analyzer_error": str(e)
+                }
+            )
+            state.dimensions["code_quality"] = eval_result
+            state.add_trace(
+                agent_role="QualityAgent",
+                action="QUALITY_AUDIT_FAILED",
+                reasoning=f"MetricsAggregator failed: {str(e)}",
+                details=eval_result.raw_metrics
+            )
+            return eval_result
 
         summary_data = report.get("summary", {})
         metrics_data = report.get("metrics", {})

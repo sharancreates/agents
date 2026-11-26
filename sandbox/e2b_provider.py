@@ -17,15 +17,21 @@ class E2BSandboxProvider(BaseSandboxProvider):
         self.api_key = api_key or os.getenv("E2B_API_KEY")
 
     def is_available(self) -> bool:
-        """Available if E2B_API_KEY is configured in the environment."""
-        return bool(self.api_key and len(self.api_key.strip()) > 0)
+        """Available if E2B_API_KEY is configured in the environment and e2b_code_interpreter is installed."""
+        if not (self.api_key and len(self.api_key.strip()) > 0):
+            return False
+        try:
+            import e2b_code_interpreter
+            return True
+        except ImportError:
+            return False
 
     def execute(self, request: SandboxExecutionRequest) -> SandboxResult:
         if not self.is_available():
             return SandboxResult(
                 status="FAILED",
                 exit_code=1,
-                stderr="E2B_SANDBOX_ERROR: E2B_API_KEY is not configured.",
+                stderr="E2B_SANDBOX_ERROR: E2B_API_KEY is missing or 'e2b_code_interpreter' SDK is not installed.",
                 duration_ms=0.0
             )
 
@@ -43,6 +49,12 @@ class E2BSandboxProvider(BaseSandboxProvider):
                 if not code_content and request.script_path and os.path.exists(request.script_path):
                     with open(request.script_path, "r", encoding="utf-8", errors="ignore") as f:
                         code_content = f.read()
+
+                # Feed request test-case stdin into execution environment
+                if request.stdin_data:
+                    stdin_repr = repr(request.stdin_data)
+                    if request.language == "python" or not request.language:
+                        code_content = f"import sys, io\nsys.stdin = io.StringIO({stdin_repr})\n" + code_content
 
                 execution = sandbox.run_code(code_content)
                 duration_ms = (time.perf_counter() - start_time) * 1000.0

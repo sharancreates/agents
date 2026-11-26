@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api import models
-from api.auth import get_current_org, get_db
+from api.auth import get_current_org, get_db, require_scope
 from api.billing_service import BillingService, CREDIT_PACKAGES
 
 router = APIRouter(prefix="/v1/billing", tags=["Monetization & Razorpay Billing"])
@@ -24,7 +24,7 @@ class VerifyPaymentRequest(BaseModel):
 
 @router.get("/balance")
 def get_credit_balance(
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("billing:read")),
     db: Session = Depends(get_db)
 ):
     """
@@ -36,7 +36,7 @@ def get_credit_balance(
 @router.post("/orders", status_code=status.HTTP_201_CREATED)
 def create_billing_order(
     request: CreateOrderRequest,
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("billing:write")),
     db: Session = Depends(get_db)
 ):
     """
@@ -55,7 +55,7 @@ def create_billing_order(
 @router.post("/verify-payment")
 def verify_payment(
     request: VerifyPaymentRequest,
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("billing:write")),
     db: Session = Depends(get_db)
 ):
     """

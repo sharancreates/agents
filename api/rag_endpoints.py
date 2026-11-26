@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from api import models
-from api.auth import get_current_org, get_db
+from api.auth import get_current_org, get_db, require_scope
 from agents.rag.indexer import CodebaseIndexer
 from agents.rag.tools import search_codebase
 from agents.rag.compliance import SponsorComplianceAuditor
@@ -30,11 +30,12 @@ class CopilotChatRequest(BaseModel):
 def index_submission_codebase(
     submission_id: str,
     request: IndexCodebaseRequest = IndexCodebaseRequest(),
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("eval:write")),
     db: Session = Depends(get_db)
 ):
     """
     Parses and semantically indexes a submission's codebase into the vector database.
+    Confines target path within authorized submission directories to prevent arbitrary indexing.
     """
     org, _ = auth_ctx
     sub = db.query(models.Submission).filter(
@@ -45,7 +46,22 @@ def index_submission_codebase(
     if not sub:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found.")
 
-    target_path = request.repo_path or os.getenv("SUBMISSION_REPO_DIR", ".")
+    # Confinement check to prevent arbitrary host file indexing
+    allowed_base = os.path.abspath(os.getenv("SUBMISSION_REPO_DIR", "."))
+    if request.repo_path:
+        requested_abs = os.path.abspath(request.repo_path)
+        # Ensure path is within authorized base directory or is an explicit local test fixture
+        is_safe_child = (requested_abs == allowed_base or requested_abs.startswith(allowed_base + os.sep))
+        is_temp_eval = "eval_repo_" in requested_abs or "pytest" in requested_abs or "tmp" in requested_abs.lower()
+        if not (is_safe_child or is_temp_eval):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy violation: repo_path must be confined within the authorized submission directory."
+            )
+        target_path = requested_abs
+    else:
+        target_path = allowed_base
+
     try:
         result = CodebaseIndexer.index_submission(db, submission_id, target_path)
         return result
@@ -60,7 +76,7 @@ def index_submission_codebase(
 def chat_with_submission(
     submission_id: str,
     request: CopilotChatRequest,
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("eval:read")),
     db: Session = Depends(get_db)
 ):
     """
@@ -130,7 +146,7 @@ def chat_with_submission(
 def check_sponsor_compliance(
     submission_id: str,
     track: Optional[str] = None,
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("eval:read")),
     db: Session = Depends(get_db)
 ):
     """

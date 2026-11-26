@@ -56,6 +56,7 @@ class WebhookEndpoint(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     url = Column(String, nullable=False)
     secret_hash = Column(String(64), nullable=False)
+    signing_secret = Column(String, nullable=True)
     events = Column(JSON, default=lambda: ["evaluation.completed", "evaluation.failed"])
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))

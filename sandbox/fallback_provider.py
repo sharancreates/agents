@@ -49,6 +49,15 @@ class RestrictedFallbackProvider(BaseSandboxProvider):
     def execute(self, request: SandboxExecutionRequest) -> SandboxResult:
         cfg = request.config or SandboxConfig()
 
+        # In production environments, require explicit opt-in for uncontained host execution
+        if os.getenv("ENVIRONMENT") == "production" and os.getenv("ALLOW_UNSAFE_FALLBACK", "false").lower() not in ("true", "1"):
+            return SandboxResult(
+                status="FAILED",
+                exit_code=1,
+                stderr="SECURITY_POLICY_VIOLATION: Untrusted code execution via fallback provider is prohibited in production without Docker or E2B microVMs.",
+                duration_ms=0.0
+            )
+
         # Static pre-execution security scan when network is prohibited
         code_to_check = request.code or ""
         if request.script_path and os.path.exists(request.script_path):
@@ -94,7 +103,10 @@ class RestrictedFallbackProvider(BaseSandboxProvider):
                 with open(target_path, "w", encoding="utf-8") as f:
                     f.write(request.code)
             elif request.script_path and os.path.exists(request.script_path):
-                target_path = request.script_path
+                # Copy target script into isolated temporary workspace to prevent in-place host mutations
+                ext = os.path.splitext(request.script_path)[1] or (".py" if request.language == "python" else ".js")
+                target_path = os.path.join(temp_dir, f"target{ext}")
+                shutil.copyfile(request.script_path, target_path)
             else:
                 return SandboxResult(
                     status="FAILED",
@@ -108,13 +120,23 @@ class RestrictedFallbackProvider(BaseSandboxProvider):
             proc = None
 
             try:
+                # Sanitize execution environment: strip database URLs, cloud credentials, tokens
+                clean_env = {
+                    "PATH": os.getenv("PATH", ""),
+                    "SYSTEMROOT": os.getenv("SYSTEMROOT", ""),
+                    "TEMP": temp_dir,
+                    "TMP": temp_dir,
+                    "PYTHONDONTWRITEBYTECODE": "1"
+                }
                 proc = subprocess.Popen(
                     cmd,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
-                    bufsize=1
+                    bufsize=1,
+                    cwd=temp_dir,
+                    env=clean_env
                 )
 
                 if request.stdin_data:

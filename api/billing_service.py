@@ -155,41 +155,50 @@ class BillingService:
             logger.warning(f"Payment verification rejected: Invalid signature for Order {order_id}, Payment {payment_id}")
             raise ValueError("Invalid payment signature. Verification failed.")
 
-        # 2. Double-Spend & Replay Check
-        existing_paid = db.query(models.PaymentOrder).filter(
-            models.PaymentOrder.razorpay_payment_id == payment_id,
-            models.PaymentOrder.status == "paid"
-        ).first()
-        if existing_paid:
-            logger.warning(f"Replay attack blocked: Payment ID {payment_id} was already credited.")
-            raise ValueError("Payment ID has already been credited. Replay rejected.")
+        # 2. Atomic Order Verification, Replay Check, and Balance Increment
+        try:
+            # Query order with row-level lock where supported to prevent concurrent race conditions
+            order_query = db.query(models.PaymentOrder).filter(
+                models.PaymentOrder.razorpay_order_id == order_id
+            )
+            try:
+                order = order_query.with_for_update().first()
+            except Exception:
+                # SQLite fallback
+                order = order_query.first()
 
-        # 3. Order lookup and validation
-        order = db.query(models.PaymentOrder).filter(
-            models.PaymentOrder.razorpay_order_id == order_id
-        ).first()
+            if not order:
+                raise ValueError(f"Order ID '{order_id}' not found.")
+            if order.organization_id != org_id:
+                raise ValueError("Order does not belong to the calling organization.")
+            if order.status == "paid":
+                raise ValueError(f"Order '{order_id}' has already been fulfilled.")
 
-        if not order:
-            raise ValueError(f"Order ID '{order_id}' not found.")
-        if order.organization_id != org_id:
-            raise ValueError("Order does not belong to the calling organization.")
-        if order.status == "paid":
-            raise ValueError(f"Order '{order_id}' has already been fulfilled.")
+            # Double-Spend & Replay Check under active lock
+            existing_paid = db.query(models.PaymentOrder).filter(
+                models.PaymentOrder.razorpay_payment_id == payment_id,
+                models.PaymentOrder.status == "paid"
+            ).first()
+            if existing_paid:
+                logger.warning(f"Replay attack blocked: Payment ID {payment_id} was already credited.")
+                raise ValueError("Payment ID has already been credited. Replay rejected.")
 
-        # 4. Atomic credit grant & order state transition
-        account = BillingService.get_or_create_credit_account(db, org_id)
-        
-        order.razorpay_payment_id = payment_id
-        order.status = "paid"
-        order.paid_at = datetime.datetime.now(datetime.timezone.utc)
+            # Transition order state and increment credits in single atomic unit
+            order.razorpay_payment_id = payment_id
+            order.status = "paid"
+            order.paid_at = datetime.datetime.now(datetime.timezone.utc)
 
-        account.balance += float(order.credits_to_grant)
-        account.total_purchased += float(order.credits_to_grant)
-        account.updated_at = datetime.datetime.now(datetime.timezone.utc)
+            account = BillingService.get_or_create_credit_account(db, org_id)
+            account.balance += float(order.credits_to_grant)
+            account.total_purchased += float(order.credits_to_grant)
+            account.updated_at = datetime.datetime.now(datetime.timezone.utc)
 
-        db.commit()
-        db.refresh(account)
-        db.refresh(order)
+            db.commit()
+            db.refresh(account)
+            db.refresh(order)
+        except Exception:
+            db.rollback()
+            raise
 
         logger.info(
             f"Successfully credited {order.credits_to_grant} credits to Org #{org_id} "
