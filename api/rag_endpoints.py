@@ -41,7 +41,7 @@ def index_submission_codebase(
     org, _ = auth_ctx
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:
@@ -101,7 +101,7 @@ def chat_with_submission(
     org, _ = auth_ctx
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:
@@ -170,7 +170,7 @@ def check_sponsor_compliance(
     org, _ = auth_ctx
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:

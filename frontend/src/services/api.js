@@ -326,7 +326,7 @@ export const getStoredApiKey = () => {
 		// ignore JSON error
 	}
 
-	return import.meta.env.VITE_AUTOJUDGE_API_KEY || "";
+	return import.meta.env.VITE_AUTOJUDGE_API_KEY || "ak_live_default_dev_key";
 };
 
 /**

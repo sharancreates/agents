@@ -204,7 +204,7 @@ def get_evaluation(
 
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:
@@ -241,7 +241,7 @@ def get_evaluation_traces(
 
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:
@@ -265,7 +265,7 @@ def stream_evaluation_events(
     org, _ = auth_ctx
     sub = db.query(models.Submission).filter(
         models.Submission.submission_id == submission_id,
-        models.Submission.organization_id == org.id
+        (models.Submission.organization_id == org.id) | (models.Submission.organization_id == None)
     ).first()
 
     if not sub:

@@ -69,6 +69,48 @@ class SynthesisRequest(BaseModel):
 def seed_database():
     db = SessionLocal()
     try:
+        # 1. Seed default organization and development API key
+        default_org = db.query(models.Organization).filter(models.Organization.slug == "default-org").first()
+        if not default_org:
+            default_org = models.Organization(
+                name="Default Organization",
+                slug="default-org",
+                tier="enterprise"
+            )
+            db.add(default_org)
+            db.commit()
+            db.refresh(default_org)
+
+            # Create default development API key: ak_live_default_dev_key
+            from api.auth import hash_secret
+            dev_key = "ak_live_default_dev_key"
+            prefix = "ak_live_default"
+            key_hash = hash_secret(dev_key)
+            api_key_rec = models.ApiKey(
+                organization_id=default_org.id,
+                name="Default Development Key",
+                key_prefix=prefix,
+                key_hash=key_hash,
+                scopes=["eval:read", "eval:write", "billing:read", "billing:write", "webhooks:manage", "admin:keys"],
+                is_active=True
+            )
+            db.add(api_key_rec)
+
+            credit = models.OrganizationCredit(
+                organization_id=default_org.id,
+                balance=100.0,
+                total_purchased=100.0,
+                total_consumed=0.0
+            )
+            db.add(credit)
+            db.commit()
+
+        # Update any unattached legacy submissions to default_org
+        db.query(models.Submission).filter(models.Submission.organization_id == None).update(
+            {"organization_id": default_org.id}
+        )
+        db.commit()
+
         if db.query(models.Submission).count() > 0:
             return
         
@@ -97,6 +139,7 @@ def seed_database():
             
             sub = models.Submission(
                 submission_id=item.get("submission_id"),
+                organization_id=default_org.id,
                 team_name=item.get("team_name"),
                 repo_url=item.get("repo_url"),
                 commit_sha=item.get("commit_sha") or str(uuid.uuid4()).replace("-", "")[:40],
