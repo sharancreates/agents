@@ -308,11 +308,58 @@ export const fetchParticipantFeedback = async (submissionId) => {
 const V1_BASE_URL = API_BASE_URL.replace("/api", "/v1");
 
 /**
+ * Retrieves the stored API key from local storage or environment.
+ */
+export const getStoredApiKey = () => {
+	const directKey = localStorage.getItem("autojudge_api_key");
+	if (directKey) return directKey;
+
+	try {
+		const saved = localStorage.getItem("autojudge_api_keys");
+		if (saved) {
+			const list = JSON.parse(saved);
+			if (Array.isArray(list) && list.length > 0 && list[0].api_key) {
+				return list[0].api_key;
+			}
+		}
+	} catch (e) {
+		// ignore JSON error
+	}
+
+	return import.meta.env.VITE_AUTOJUDGE_API_KEY || "";
+};
+
+/**
+ * Sets or removes the stored active API key.
+ */
+export const setStoredApiKey = (key) => {
+	if (key) {
+		localStorage.setItem("autojudge_api_key", key);
+	} else {
+		localStorage.removeItem("autojudge_api_key");
+	}
+};
+
+/**
+ * Constructs request headers including Authorization Bearer token when available.
+ */
+export const getAuthHeaders = (extraHeaders = {}) => {
+	const key = getStoredApiKey();
+	const headers = { ...extraHeaders };
+	if (key) {
+		headers["Authorization"] = `Bearer ${key}`;
+	}
+	return headers;
+};
+
+/**
  * Connects to live Server-Sent Events (SSE) stream for real-time agent thought observation.
  * Falls back gracefully to interval polling if SSE is unsupported or disconnected.
  */
 export const streamEvaluationTraces = (submissionId, onEvent, onError) => {
-	const streamUrl = `${V1_BASE_URL}/evaluations/${submissionId}/stream`;
+	const apiKey = getStoredApiKey();
+	const tokenQuery = apiKey ? `?token=${encodeURIComponent(apiKey)}` : "";
+	const streamUrl = `${V1_BASE_URL}/evaluations/${submissionId}/stream${tokenQuery}`;
 	let eventSource = null;
 	let pollInterval = null;
 
@@ -320,7 +367,9 @@ export const streamEvaluationTraces = (submissionId, onEvent, onError) => {
 		if (pollInterval) return;
 		pollInterval = setInterval(async () => {
 			try {
-				const res = await fetch(`${V1_BASE_URL}/evaluations/${submissionId}/traces`);
+				const res = await fetch(`${V1_BASE_URL}/evaluations/${submissionId}/traces`, {
+					headers: getAuthHeaders()
+				});
 				if (res.ok) {
 					const data = await res.json();
 					(data.traces || []).forEach(tr => {
@@ -373,7 +422,9 @@ export const streamEvaluationTraces = (submissionId, onEvent, onError) => {
  */
 export const fetchApiKeys = async () => {
 	try {
-		const res = await fetch(`${V1_BASE_URL}/api-keys`);
+		const res = await fetch(`${V1_BASE_URL}/api-keys`, {
+			headers: getAuthHeaders()
+		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		return await res.json();
 	} catch (e) {
@@ -388,7 +439,7 @@ export const createApiKey = async (payload) => {
 	try {
 		const res = await fetch(`${V1_BASE_URL}/api-keys`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: getAuthHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify(payload)
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -417,7 +468,9 @@ export const createApiKey = async (payload) => {
  */
 export const fetchWebhooks = async () => {
 	try {
-		const res = await fetch(`${V1_BASE_URL}/webhooks`);
+		const res = await fetch(`${V1_BASE_URL}/webhooks`, {
+			headers: getAuthHeaders()
+		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		return await res.json();
 	} catch (e) {
@@ -430,7 +483,7 @@ export const registerWebhook = async (payload) => {
 	try {
 		const res = await fetch(`${V1_BASE_URL}/webhooks`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: getAuthHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify(payload)
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -454,7 +507,9 @@ export const registerWebhook = async (payload) => {
  */
 export const fetchBillingBalance = async () => {
 	try {
-		const res = await fetch(`${V1_BASE_URL}/billing/balance`);
+		const res = await fetch(`${V1_BASE_URL}/billing/balance`, {
+			headers: getAuthHeaders()
+		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		return await res.json();
 	} catch (e) {
@@ -478,7 +533,7 @@ export const createBillingOrder = async (packageId) => {
 	try {
 		const res = await fetch(`${V1_BASE_URL}/billing/orders`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: getAuthHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify({ package_id: packageId })
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -506,7 +561,7 @@ export const verifyPayment = async (orderId, paymentId, signature) => {
 	try {
 		const res = await fetch(`${V1_BASE_URL}/billing/verify-payment`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: getAuthHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify({ order_id: orderId, payment_id: paymentId, signature })
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -529,7 +584,9 @@ export const verifyPayment = async (orderId, paymentId, signature) => {
 
 export const fetchBillingUsage = async () => {
 	try {
-		const res = await fetch(`${V1_BASE_URL}/billing/usage`);
+		const res = await fetch(`${V1_BASE_URL}/billing/usage`, {
+			headers: getAuthHeaders()
+		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		return await res.json();
 	} catch (e) {
@@ -546,7 +603,7 @@ export const askJudgeCopilot = async (submissionId, question, topK = 3) => {
 	try {
 		const res = await fetch(`${V1_BASE_URL}/evaluations/${submissionId}/chat`, {
 			method: "POST",
-			headers: { "Content-Type": "application/json" },
+			headers: getAuthHeaders({ "Content-Type": "application/json" }),
 			body: JSON.stringify({ question, top_k: topK })
 		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -565,7 +622,9 @@ export const askJudgeCopilot = async (submissionId, question, topK = 3) => {
 
 export const fetchSponsorCompliance = async (submissionId) => {
 	try {
-		const res = await fetch(`${V1_BASE_URL}/evaluations/${submissionId}/compliance`);
+		const res = await fetch(`${V1_BASE_URL}/evaluations/${submissionId}/compliance`, {
+			headers: getAuthHeaders()
+		});
 		if (!res.ok) throw new Error(`HTTP ${res.status}`);
 		return await res.json();
 	} catch (e) {

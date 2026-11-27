@@ -74,7 +74,7 @@ def process_submission_task(db_submission_id: int, url: str):
             rubric_weights=sub.rubric_weights
         )
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z"
+        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
 
         # Map council dimension evaluations to database fields
         cq_dim = council_state.dimensions.get("code_quality")
@@ -151,20 +151,6 @@ def process_submission_task(db_submission_id: int, url: str):
         sub.pipeline_status = "complete"
         sub.pipeline_completed_at = datetime.datetime.now(datetime.timezone.utc)
         db.commit()
-
-        # Metered Billing: Deduct 1 credit for completed evaluation
-        if sub.organization_id:
-            try:
-                from api.billing_service import BillingService
-                BillingService.deduct_credit(
-                    db=db,
-                    org_id=sub.organization_id,
-                    submission_id=sub.submission_id,
-                    credits=1.0,
-                    reason="submission_evaluation"
-                )
-            except Exception as bill_err:
-                logger.warning(f"Could not deduct credit for submission {sub.submission_id}: {bill_err}")
 
         # Asynchronously dispatch webhook notification if callback URL configured
         if sub.webhook_url:

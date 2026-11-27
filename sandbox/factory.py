@@ -19,13 +19,19 @@ def get_sandbox_provider(requested_provider: Optional[str] = None) -> BaseSandbo
         e2b_provider = E2BSandboxProvider()
         if e2b_provider.is_available():
             return e2b_provider
-        logger.warning("E2B provider requested but E2B_API_KEY is missing. Falling back to safe fallback.")
+        logger.warning("E2B provider explicitly requested but unavailable.")
+        if os.getenv("ALLOW_UNSAFE_FALLBACK", "false").lower() in ("true", "1") or os.getenv("ENVIRONMENT") != "production":
+            return RestrictedFallbackProvider()
+        raise RuntimeError("Requested sandbox provider 'e2b' is not available (E2B_API_KEY missing or SDK not installed).")
 
     if provider_name == "docker":
         docker_provider = DockerSandboxProvider()
         if docker_provider.is_available():
             return docker_provider
-        logger.warning("Docker provider requested but Docker daemon is unreachable. Falling back to safe fallback.")
+        logger.warning("Docker provider explicitly requested but Docker daemon is unreachable.")
+        if os.getenv("ALLOW_UNSAFE_FALLBACK", "false").lower() in ("true", "1") or os.getenv("ENVIRONMENT") != "production":
+            return RestrictedFallbackProvider()
+        raise RuntimeError("Requested sandbox provider 'docker' is not available (Docker daemon unreachable).")
 
     if provider_name == "fallback":
         return RestrictedFallbackProvider()

@@ -36,6 +36,34 @@ class E2BSandboxProvider(BaseSandboxProvider):
             )
 
         cfg = request.config or SandboxConfig()
+
+        # Enforce network restriction policy
+        if not cfg.allow_network:
+            forbidden_network_tokens = [
+                "import socket", "from socket import",
+                "import urllib", "from urllib import",
+                "import requests", "from requests import",
+                "import http.client", "from http.client import",
+                "import httpx", "from httpx import"
+            ]
+            check_text = request.code or ""
+            if not check_text and request.script_path and os.path.exists(request.script_path):
+                try:
+                    with open(request.script_path, "r", encoding="utf-8", errors="ignore") as f:
+                        check_text = f.read()
+                except Exception:
+                    pass
+            for token in forbidden_network_tokens:
+                if token in check_text:
+                    return SandboxResult(
+                        status="SECURITY_VIOLATION",
+                        exit_code=1,
+                        stdout="",
+                        stderr=f"SECURITY_POLICY_VIOLATION: Outbound network blocked by sandbox policy ({token}).",
+                        duration_ms=0.0,
+                        security_violation=f"Prohibited network import detected: {token}"
+                    )
+
         start_time = time.perf_counter()
 
         try:
@@ -56,21 +84,39 @@ class E2BSandboxProvider(BaseSandboxProvider):
                     if request.language == "python" or not request.language:
                         code_content = f"import sys, io\nsys.stdin = io.StringIO({stdin_repr})\n" + code_content
 
+                # Enforce runtime network disablement for Python microVM
+                if not cfg.allow_network and (request.language == "python" or not request.language):
+                    net_guard = (
+                        "import socket\n"
+                        "def _blocked_socket(*args, **kwargs):\n"
+                        "    raise PermissionError('Outbound network disabled by sandbox policy')\n"
+                        "socket.socket = _blocked_socket\n"
+                        "socket.create_connection = _blocked_socket\n"
+                    )
+                    code_content = net_guard + code_content
+
                 execution = sandbox.run_code(code_content)
                 duration_ms = (time.perf_counter() - start_time) * 1000.0
 
                 stdout_text = "\n".join(execution.logs.stdout) if execution.logs.stdout else ""
                 stderr_text = "\n".join(execution.logs.stderr) if execution.logs.stderr else ""
 
+                status = "COMPLETED" if not execution.error else "FAILED"
+                security_violation = None
+
                 if execution.error:
                     stderr_text += f"\n{execution.error.name}: {execution.error.value}"
+                    if "Outbound network disabled" in str(execution.error.value):
+                        status = "SECURITY_VIOLATION"
+                        security_violation = "Outbound network connection blocked by sandbox policy."
 
                 return SandboxResult(
-                    status="COMPLETED" if not execution.error else "FAILED",
-                    exit_code=0 if not execution.error else 1,
+                    status=status,
+                    exit_code=0 if status == "COMPLETED" else 1,
                     stdout=stdout_text,
                     stderr=stderr_text,
-                    duration_ms=round(duration_ms, 2)
+                    duration_ms=round(duration_ms, 2),
+                    security_violation=security_violation
                 )
 
         except ImportError:

@@ -1,5 +1,6 @@
 import os
 import logging
+import tempfile
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
@@ -46,19 +47,29 @@ def index_submission_codebase(
     if not sub:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evaluation not found.")
 
-    # Confinement check to prevent arbitrary host file indexing
-    allowed_base = os.path.abspath(os.getenv("SUBMISSION_REPO_DIR", "."))
+    # Confinement check with symlink resolution to prevent arbitrary host file indexing
+    allowed_base = os.path.realpath(os.getenv("SUBMISSION_REPO_DIR", "."))
     if request.repo_path:
-        requested_abs = os.path.abspath(request.repo_path)
-        # Ensure path is within authorized base directory or is an explicit local test fixture
-        is_safe_child = (requested_abs == allowed_base or requested_abs.startswith(allowed_base + os.sep))
-        is_temp_eval = "eval_repo_" in requested_abs or "pytest" in requested_abs or "tmp" in requested_abs.lower()
-        if not (is_safe_child or is_temp_eval):
+        requested_real = os.path.realpath(request.repo_path)
+        try:
+            is_under_base = (os.path.commonpath([allowed_base, requested_real]) == allowed_base)
+        except ValueError:
+            is_under_base = False
+
+        trusted_temp_root = os.path.realpath(tempfile.gettempdir())
+        try:
+            is_under_temp = (os.path.commonpath([trusted_temp_root, requested_real]) == trusted_temp_root)
+        except ValueError:
+            is_under_temp = False
+
+        # Only allow paths strictly under allowed base directory or explicit eval_repo_* directory inside tempdir
+        is_safe_eval_dir = is_under_temp and os.path.basename(requested_real).startswith("eval_repo_")
+        if not (is_under_base or is_safe_eval_dir):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Security policy violation: repo_path must be confined within the authorized submission directory."
             )
-        target_path = requested_abs
+        target_path = requested_real
     else:
         target_path = allowed_base
 

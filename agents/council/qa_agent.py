@@ -120,12 +120,15 @@ class QAAgent:
         elif timeouts > 0:
             flags.append("EXECUTION_TIMEOUT")
             score = max(0.0, report.success_rate - 30.0)
+        elif report.passed_tests == 0 and report.total_tests > 0:
+            # Submissions that fail all test cases receive 0.0 rather than inflated zero-crash baseline
+            flags.append("ALL_TESTS_FAILED")
+            score = 0.0
         elif crashes == 0 and report.passed_tests > 0:
             flags.append("CLEAN_EXECUTION")
             score = report.success_rate
         else:
-            # Baseline score on graceful zero-crash execution
-            score = 75.0 if crashes == 0 else max(20.0, 100.0 - (crashes * 20.0))
+            score = max(0.0, report.success_rate - (crashes * 20.0))
 
         summary = (
             f"Executed {report.total_tests} dynamic tests against {env.entrypoint_script}. "

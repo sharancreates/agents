@@ -16,12 +16,18 @@ RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET", DEFAULT_SIMULATED_KEY_SEC
 RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", DEFAULT_SIMULATED_WEBHOOK_SECRET)
 
 def is_simulation_mode() -> bool:
-    """Returns True if running with simulated/test credentials."""
-    return (
-        not os.getenv("RAZORPAY_KEY_ID") 
-        or os.getenv("RAZORPAY_KEY_ID").startswith("rzp_test_simulated")
-        or os.getenv("RAZORPAY_SIMULATION", "true").lower() in ("true", "1", "yes")
-    )
+    """
+    Returns True only if running with test credentials or explicitly configured test mode.
+    Never defaults to simulation mode when live credentials (rzp_live_) are present.
+    """
+    key_id = os.getenv("RAZORPAY_KEY_ID")
+    if not key_id:
+        return True
+    if key_id.startswith("rzp_live_"):
+        return False
+    if key_id.startswith("rzp_test_simulated"):
+        return True
+    return os.getenv("RAZORPAY_SIMULATION", "false").lower() in ("true", "1", "yes")
 
 def _resolve_secret(explicit_secret: Optional[str], env_var_name: str, simulated_default: str) -> str:
     """Resolves secret, prohibiting default simulated secrets in production mode."""

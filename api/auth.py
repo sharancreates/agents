@@ -6,7 +6,7 @@ import datetime
 import time
 import collections
 from typing import Optional, Tuple, List, Dict
-from fastapi import Header, HTTPException, status, Depends
+from fastapi import Header, Query, HTTPException, status, Depends
 from sqlalchemy.orm import Session
 
 from api.database import SessionLocal
@@ -171,21 +171,31 @@ def require_scope(required_scope: str):
 
 def get_current_org(
     authorization: Optional[str] = Header(None),
+    token: Optional[str] = Query(None),
+    api_key: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ) -> Tuple[models.Organization, models.ApiKey]:
     """
     FastAPI security dependency validating Authorization header: Bearer <ak_live_...>
+    or token query parameter: ?token=ak_live_... / ?api_key=ak_live_...
     Enforces API key authentication and rate limiting per organization tier.
     """
-    if not authorization or not authorization.startswith("Bearer "):
+    token_str = None
+    if authorization and authorization.startswith("Bearer "):
+        token_str = authorization.split("Bearer ", 1)[1].strip()
+    elif token:
+        token_str = token.strip()
+    elif api_key:
+        token_str = api_key.strip()
+
+    if not token_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or malformed Authorization header. Expected 'Bearer ak_live_...'",
+            detail="Missing or malformed Authorization header. Expected 'Bearer ak_live_...' or query parameter '?token=ak_live_...'",
             headers={"WWW-Authenticate": "Bearer"}
         )
 
-    token = authorization.split("Bearer ", 1)[1].strip()
-    result = verify_api_key(db, token)
+    result = verify_api_key(db, token_str)
 
     if not result:
         raise HTTPException(

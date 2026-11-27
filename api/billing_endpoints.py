@@ -114,7 +114,7 @@ async def razorpay_webhook(
 @router.get("/usage")
 def get_usage_ledger(
     limit: int = 50,
-    auth_ctx: tuple = Depends(get_current_org),
+    auth_ctx: tuple = Depends(require_scope("billing:read")),
     db: Session = Depends(get_db)
 ):
     """

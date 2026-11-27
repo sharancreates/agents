@@ -60,11 +60,11 @@ def seed_portal_org():
     }
 
 def test_sse_stream_endpoint_headers_and_events(client, seed_portal_org):
-    """Verifies that GET /v1/evaluations/{id}/stream streams SSE events."""
+    """Verifies that GET /v1/evaluations/{id}/stream streams SSE events with header and token query parameter."""
     headers = {"Authorization": f"Bearer {seed_portal_org['api_key']}"}
     sub_id = seed_portal_org["submission_id"]
 
-    # Request SSE stream using streaming context
+    # 1. Request SSE stream using streaming context with Authorization header
     with client.stream("GET", f"/v1/evaluations/{sub_id}/stream", headers=headers) as resp:
         assert resp.status_code == 200
         assert "text/event-stream" in resp.headers["content-type"]
@@ -82,6 +82,15 @@ def test_sse_stream_endpoint_headers_and_events(client, seed_portal_org):
 
         event_types = [e.get("event") for e in raw_events]
         assert "connected" in event_types
+
+    # 2. Browser EventSource path: authenticate via ?token=... query parameter
+    with client.stream("GET", f"/v1/evaluations/{sub_id}/stream?token={seed_portal_org['api_key']}") as resp_query:
+        assert resp_query.status_code == 200
+        assert "text/event-stream" in resp_query.headers["content-type"]
+
+    # 3. Reject unauthenticated SSE connection
+    resp_unauth = client.get(f"/v1/evaluations/{sub_id}/stream")
+    assert resp_unauth.status_code == 401
 
 def test_developer_portal_api_keys(client, seed_portal_org):
     """Verifies listing and issuing scoped API keys."""

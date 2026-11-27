@@ -125,21 +125,29 @@ def create_evaluation(
         originality=pending_dim,
         innovation=pending_dim
     )
+    # Atomic Credit Reservation: Deduct credit before creating and enqueueing job
+    # Prevents concurrent requests from passing quota checks and executing without funds
+    reserved = BillingService.deduct_credit(
+        db=db,
+        org_id=org.id,
+        submission_id=sub_id,
+        credits=1.0,
+        reason="submission_reserve"
+    )
+    if not reserved:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail={
+                "error": "INSUFFICIENT_CREDITS",
+                "message": "Failed to reserve evaluation credit. Balance may have been consumed by a concurrent run.",
+                "organization_id": org.id,
+                "top_up_endpoint": "/v1/billing/orders"
+            }
+        )
+
     db.add(new_sub)
     db.commit()
     db.refresh(new_sub)
-
-    # Atomically reserve credit before dispatching background job (prevents concurrent overdrawing)
-    try:
-        BillingService.deduct_credit(
-            db=db,
-            org_id=org.id,
-            submission_id=new_sub.submission_id,
-            credits=1.0,
-            reason="submission_reserve"
-        )
-    except Exception as deduct_err:
-        logger.warning(f"Credit reservation warning for {new_sub.submission_id}: {deduct_err}")
 
     # Dispatch to Celery worker pipeline
     process_submission_task.delay(new_sub.id, new_sub.repo_url)

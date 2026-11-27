@@ -26,10 +26,16 @@ def sample_repo(tmpdir):
 
 def main():
     data = sys.stdin.read().strip()
-    if data:
-        print(f"CALC_OUTPUT:{data}")
-    else:
+    if not data:
         print("EMPTY_INPUT")
+        return
+    parts = data.split()
+    try:
+        nums = [float(p) for p in parts]
+        res = sum(nums)
+        print(f"{int(res) if res.is_integer() else res}")
+    except Exception:
+        print(f"CALC_OUTPUT:{data}")
 
 if __name__ == '__main__':
     main()

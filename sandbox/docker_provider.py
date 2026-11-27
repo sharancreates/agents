@@ -35,7 +35,14 @@ class DockerSandboxProvider(BaseSandboxProvider):
 
     def execute(self, request: SandboxExecutionRequest) -> SandboxResult:
         cfg = request.config or SandboxConfig()
-        image = cfg.image or self.default_image
+
+        # Resolve language-appropriate image when unset
+        if cfg.image:
+            image = cfg.image
+        elif request.language in ("javascript", "js", "typescript", "ts"):
+            image = os.getenv("SANDBOX_NODE_IMAGE", "node:20-alpine")
+        else:
+            image = self.default_image
 
         # Prepare temporary directory for mounting
         with tempfile.TemporaryDirectory(prefix="autojudge_sandbox_") as temp_dir:
@@ -59,6 +66,13 @@ class DockerSandboxProvider(BaseSandboxProvider):
                     stderr=f"Error: Target script not found: {request.script_path}"
                 )
 
+            # Ensure staged directory and file are readable/executable by unprivileged container UID (1000:1000)
+            try:
+                os.chmod(temp_dir, 0o755)
+                os.chmod(dest_path, 0o644)
+            except Exception:
+                pass
+
             # Determine runtime command inside container
             if request.language == "python":
                 cmd = ["python3", "-u", f"/sandbox_env/{target_filename}"]
@@ -72,8 +86,12 @@ class DockerSandboxProvider(BaseSandboxProvider):
             # Normalize temp_dir path for Docker volume mounting on Windows/Linux
             mount_path = os.path.abspath(temp_dir).replace("\\", "/")
 
+            import uuid
+            container_name = f"autojudge_run_{uuid.uuid4().hex[:12]}"
+
             docker_cmd = [
                 self._docker_bin, "run", "--rm", "-i",
+                "--name", container_name,
                 "--read-only",
                 "--tmpfs", "/tmp:rw,noexec,nosuid,size=64m",
                 "--cap-drop", "ALL",
@@ -94,6 +112,7 @@ class DockerSandboxProvider(BaseSandboxProvider):
             docker_cmd.extend(cmd)
 
             start_time = time.perf_counter()
+            security_violation = None
             try:
                 proc = subprocess.Popen(
                     docker_cmd,
@@ -120,6 +139,17 @@ class DockerSandboxProvider(BaseSandboxProvider):
                     stderr_data = (stderr_data or "") + "\nPROCESS_KILLED: Out of Memory (OOM) limit exceeded."
                 elif proc.returncode != 0:
                     status = "FAILED"
+                    # If outbound network was denied, detect network failure in stderr and classify as SECURITY_VIOLATION
+                    if not cfg.allow_network:
+                        net_indicators = [
+                            "network is unreachable", "connection refused", "socket.error",
+                            "socket.gaierror", "urllib.error.urlerror", "econnrefused",
+                            "enetunreach", "errno 101", "errno 111", "temporary failure in name resolution"
+                        ]
+                        stderr_lower = (stderr_data or "").lower()
+                        if any(ind in stderr_lower for ind in net_indicators):
+                            status = "SECURITY_VIOLATION"
+                            security_violation = "Outbound network connection blocked by sandbox policy (--network none)."
 
                 return SandboxResult(
                     status=status,
@@ -127,9 +157,10 @@ class DockerSandboxProvider(BaseSandboxProvider):
                     stdout=stdout_data or "",
                     stderr=stderr_data or "",
                     duration_ms=round(duration_ms, 2),
-                    peak_memory_bytes=0, # In cgroups, limits enforced at kernel level
+                    peak_memory_bytes=0,
                     timed_out=timed_out,
-                    oom_killed=oom_killed
+                    oom_killed=oom_killed,
+                    security_violation=security_violation
                 )
 
             except subprocess.TimeoutExpired:
@@ -137,6 +168,17 @@ class DockerSandboxProvider(BaseSandboxProvider):
                 try:
                     proc.kill()
                     proc.communicate()
+                except Exception:
+                    pass
+
+                # Explicitly terminate and clean up container in Docker daemon
+                try:
+                    subprocess.run(
+                        [self._docker_bin, "rm", "-f", container_name],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5.0
+                    )
                 except Exception:
                     pass
 
@@ -157,3 +199,14 @@ class DockerSandboxProvider(BaseSandboxProvider):
                     stderr=f"DOCKER_SANDBOX_ERROR: {str(e)}",
                     duration_ms=round(duration_ms, 2)
                 )
+            finally:
+                # Ensure container is never orphaned in daemon
+                try:
+                    subprocess.run(
+                        [self._docker_bin, "rm", "-f", container_name],
+                        stdout=subprocess.DEVNULL,
+                        stderr=subprocess.DEVNULL,
+                        timeout=5.0
+                    )
+                except Exception:
+                    pass

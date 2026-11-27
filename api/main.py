@@ -17,9 +17,11 @@ from api.v1_endpoints import router as v1_router
 from api.billing_endpoints import router as billing_router
 from api.rag_endpoints import router as rag_router
 
-# Attempt database tables creation defensively
+# Attempt database tables creation and schema migrations defensively
 try:
     models.Base.metadata.create_all(bind=engine)
+    from api.database import run_schema_migrations
+    run_schema_migrations(engine)
 except Exception as e:
     print(f"Warning: Database connection deferred: {e}")
 

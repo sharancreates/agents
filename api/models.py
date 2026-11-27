@@ -1,4 +1,5 @@
 import datetime
+from typing import Optional, List, Dict, Any
 from sqlalchemy import Column, Integer, String, Float, Boolean, JSON, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from api.database import Base
@@ -56,12 +57,27 @@ class WebhookEndpoint(Base):
     organization_id = Column(Integer, ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False, index=True)
     url = Column(String, nullable=False)
     secret_hash = Column(String(64), nullable=False)
-    signing_secret = Column(String, nullable=True)
+    signing_secret_encrypted = Column(String, nullable=True)
     events = Column(JSON, default=lambda: ["evaluation.completed", "evaluation.failed"])
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=lambda: datetime.datetime.now(datetime.timezone.utc))
 
     organization = relationship("Organization", back_populates="webhooks")
+
+    @property
+    def signing_secret(self) -> Optional[str]:
+        if not self.signing_secret_encrypted:
+            return None
+        from api.webhook_service import decrypt_webhook_secret
+        return decrypt_webhook_secret(self.signing_secret_encrypted)
+
+    @signing_secret.setter
+    def signing_secret(self, val: Optional[str]):
+        if val is None:
+            self.signing_secret_encrypted = None
+        else:
+            from api.webhook_service import encrypt_webhook_secret
+            self.signing_secret_encrypted = encrypt_webhook_secret(val)
 
 class Submission(Base):
     __tablename__ = "submissions"

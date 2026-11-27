@@ -9,7 +9,7 @@ class SandboxConfig(BaseModel):
     pids_limit: int = Field(default=64, description="Maximum number of concurrent processes.")
     read_only: bool = Field(default=True, description="Enforce read-only root filesystem.")
     allow_network: bool = Field(default=False, description="Whether outbound network connectivity is permitted.")
-    image: str = Field(default="ubuntu:22.04", description="Container image to use for execution.")
+    image: Optional[str] = Field(default=None, description="Container image to use for execution. If unset, resolved by runtime.")
 
 class SandboxExecutionRequest(BaseModel):
     """Payload representing an execution job inside the sandbox."""

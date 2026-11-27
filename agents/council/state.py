@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class AgentTraceEvent(BaseModel):
     """Immutable audit trace of an autonomous agent decision, perception, or tool invocation."""
-    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat() + "Z")
+    timestamp: str = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc).isoformat().replace("+00:00", "Z"))
     agent_role: str
     action: str
     reasoning: str
