@@ -17,17 +17,27 @@ RAZORPAY_WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", DEFAULT_SIMULATED
 
 def is_simulation_mode() -> bool:
     """
-    Returns True only if running with test credentials or explicitly configured test mode.
-    Never defaults to simulation mode when live credentials (rzp_live_) are present.
+    Returns True only when explicitly running in test/simulation mode.
+    In production deployments (ENVIRONMENT=production), simulation is strictly prohibited
+    and missing credentials fail closed.
     """
-    key_id = os.getenv("RAZORPAY_KEY_ID")
-    if not key_id:
-        return True
-    if key_id.startswith("rzp_live_"):
+    is_prod = (os.getenv("ENVIRONMENT", "development") == "production")
+    if is_prod:
         return False
-    if key_id.startswith("rzp_test_simulated"):
+
+    key_id = os.getenv("RAZORPAY_KEY_ID")
+    if key_id and key_id.startswith("rzp_live_"):
+        return False
+
+    # In non-production, allow explicit opt-in or test keys
+    if os.getenv("RAZORPAY_SIMULATION", "false").lower() in ("true", "1", "yes"):
         return True
-    return os.getenv("RAZORPAY_SIMULATION", "false").lower() in ("true", "1", "yes")
+    if key_id and key_id.startswith("rzp_test_simulated"):
+        return True
+    if not key_id and (os.getenv("PYTEST_CURRENT_TEST") or os.getenv("ENVIRONMENT", "development") in ("development", "test")):
+        return True
+
+    return False
 
 def _resolve_secret(explicit_secret: Optional[str], env_var_name: str, simulated_default: str) -> str:
     """Resolves secret, prohibiting default simulated secrets in production mode."""
@@ -121,19 +131,29 @@ class SimulatedRazorpayClient:
 
 def get_razorpay_client():
     """
-    Factory returning live Razorpay SDK Client if configured and installed,
-    or SimulatedRazorpayClient for testing/CI.
+    Factory returning live Razorpay SDK Client if configured,
+    or SimulatedRazorpayClient when explicitly in simulation mode.
+    Fails closed if live credentials are configured but the SDK is missing.
     """
     key_id = os.getenv("RAZORPAY_KEY_ID")
     key_secret = os.getenv("RAZORPAY_KEY_SECRET")
-    
-    # If live keys are present, attempt importing official razorpay client
-    if key_id and key_secret and not key_id.startswith("rzp_test_simulated"):
+    is_prod = (os.getenv("ENVIRONMENT", "development") == "production")
+
+    if is_prod and (not key_id or not key_secret):
+        raise RuntimeError("Payment gateway error: RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET must be configured in production.")
+
+    # If live/configured keys are present (or production mode)
+    if (key_id and not key_id.startswith("rzp_test_simulated")) or is_prod:
         try:
             import razorpay
-            client = razorpay.Client(auth=(key_id, key_secret))
-            return client
+            return razorpay.Client(auth=(key_id, key_secret))
         except ImportError:
-            logger.warning("razorpay package not installed; falling back to simulated client.")
-            
-    return SimulatedRazorpayClient(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+            raise RuntimeError(
+                "CRITICAL_CONFIGURATION_ERROR: Live Razorpay credentials are configured, "
+                "but the 'razorpay' Python SDK package is not installed."
+            )
+
+    if is_simulation_mode():
+        return SimulatedRazorpayClient(key_id or RAZORPAY_KEY_ID, key_secret or RAZORPAY_KEY_SECRET)
+
+    raise RuntimeError("Razorpay credentials are not configured and simulation mode is disabled.")

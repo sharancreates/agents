@@ -48,9 +48,20 @@ class CriticAgent:
         state.dimensions["innovation"] = innov_eval
 
         # 2. Evidence validation loop across dimensions
+        HARD_FAILURE_FLAGS = {
+            "ENTRYPOINT_MISSING_ON_DISK",
+            "NO_ENTRYPOINT_DISCOVERED",
+            "ALL_TESTS_FAILED",
+            "SECURITY_VIOLATION_BLOCKED",
+            "EXECUTION_TIMEOUT",
+            "OOM_LIMIT_EXCEEDED"
+        }
+
         for dim_name, eval_item in list(state.dimensions.items()):
-            # If an agent gave a severe penalty (< 50) without citations, challenge and adjust
-            if eval_item.score < 50.0 and len(eval_item.evidence_citations) == 0:
+            # Preserve explicit hard execution failures (missing entrypoints, test suite wipeouts, timeouts)
+            has_hard_failure = any(flag in HARD_FAILURE_FLAGS for flag in (eval_item.flags or []))
+            # If an agent gave a severe penalty (< 50) without citations and WITHOUT verified hard failure flags, challenge and adjust
+            if not has_hard_failure and eval_item.score < 50.0 and len(eval_item.evidence_citations) == 0:
                 critic_notes.append(f"Rebounded ungrounded penalty in '{dim_name}' from {eval_item.score} to 65.0 due to lack of citations.")
                 eval_item.score = 65.0
 

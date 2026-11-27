@@ -129,7 +129,22 @@ def startup_event():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "orchestrator"}
+    from api.database import MIGRATION_STATUS
+    from sqlalchemy import text
+    db_ok = True
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+
+    is_healthy = db_ok and MIGRATION_STATUS.get("completed", True)
+    return {
+        "status": "healthy" if is_healthy else "degraded",
+        "service": "orchestrator",
+        "database": "connected" if db_ok else "unreachable",
+        "schema_migration": "completed" if MIGRATION_STATUS.get("completed") else MIGRATION_STATUS
+    }
 
 # Submissions Endpoints
 @app.get("/api/submissions")

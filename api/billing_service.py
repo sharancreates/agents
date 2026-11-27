@@ -1,6 +1,7 @@
 import datetime
 import logging
 from typing import Dict, Any, List, Optional
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from api import models
@@ -267,16 +268,30 @@ class BillingService:
         reason: str = "submission_evaluation"
     ) -> bool:
         """
-        Atomically decrements credit balance and records an immutable UsageEvent ledger entry.
+        Atomically decrements credit balance via conditional SQL update and records an immutable UsageEvent.
+        Prevents overspending and race conditions between concurrent evaluation requests.
         """
         account = BillingService.get_or_create_credit_account(db, org_id)
-        if account.balance < credits:
-            logger.warning(f"Credit deduction failed: Org #{org_id} balance {account.balance} < {credits}")
+
+        now = datetime.datetime.now(datetime.timezone.utc)
+        stmt = text("""
+            UPDATE organization_credits
+            SET balance = balance - :amount,
+                total_consumed = total_consumed + :amount,
+                updated_at = :now
+            WHERE organization_id = :org_id AND balance >= :amount
+        """)
+        res = db.execute(stmt, {
+            "amount": float(credits),
+            "org_id": org_id,
+            "now": now
+        })
+
+        if res.rowcount == 0:
+            logger.warning(f"Atomic credit deduction failed: Org #{org_id} balance insufficient for {credits}")
             return False
 
-        account.balance = max(0.0, account.balance - credits)
-        account.total_consumed += credits
-        account.updated_at = datetime.datetime.now(datetime.timezone.utc)
+        db.refresh(account)
 
         usage = models.UsageEvent(
             organization_id=org_id,

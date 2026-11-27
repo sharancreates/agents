@@ -75,6 +75,36 @@ def create_evaluation(
                 detail=f"Invalid webhook callback URL: {str(e)}"
             )
 
+    # Validate repo_url: reject arbitrary host filesystem paths
+    repo = (request.repo_url or "").strip()
+    is_remote_url = (
+        repo.startswith("https://") or 
+        repo.startswith("http://") or 
+        repo.startswith("git://") or 
+        repo.startswith("git@")
+    )
+    is_prod = (os.getenv("ENVIRONMENT") == "production")
+
+    if not is_remote_url:
+        if is_prod:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid repo_url: Production evaluations require a valid remote repository URL (https://, http://, or git@)."
+            )
+        # In non-production testing, only permit paths strictly confined within authorized staging root
+        allowed_staging_root = os.path.realpath(os.getenv("SUBMISSION_REPO_DIR", "."))
+        real_target = os.path.realpath(repo)
+        try:
+            is_confined = (os.path.commonpath([allowed_staging_root, real_target]) == allowed_staging_root)
+        except ValueError:
+            is_confined = False
+
+        if not (os.path.isdir(real_target) and is_confined):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Security policy violation: local repo_url is not confined within authorized staging root."
+            )
+
     # Generate sequential submission ID
     max_id_row = db.query(models.Submission.id).order_by(models.Submission.id.desc()).first()
     next_num = (max_id_row[0] + 1) if max_id_row else (db.query(models.Submission).count() + 1)

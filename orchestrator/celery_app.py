@@ -61,7 +61,18 @@ def process_submission_task(db_submission_id: int, url: str):
                 logger.warning(f"Error cloning repository {url}: {clone_err}. Using fallback.")
                 repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
         elif url and os.path.isdir(url):
-            repo_path = url
+            allowed_base = os.path.realpath(os.getenv("SUBMISSION_REPO_DIR", "."))
+            real_target = os.path.realpath(url)
+            try:
+                is_confined = (os.path.commonpath([allowed_base, real_target]) == allowed_base)
+            except ValueError:
+                is_confined = False
+
+            if is_confined:
+                repo_path = real_target
+            else:
+                logger.error(f"Security policy violation: local path {url} is not confined within {allowed_base}")
+                raise ValueError(f"Security policy violation: local repository path '{url}' is not confined within authorized staging root.")
         else:
             repo_path = os.getenv("SUBMISSION_REPO_DIR", ".")
 

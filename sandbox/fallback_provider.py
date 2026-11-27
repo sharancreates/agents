@@ -49,16 +49,16 @@ class RestrictedFallbackProvider(BaseSandboxProvider):
     def execute(self, request: SandboxExecutionRequest) -> SandboxResult:
         cfg = request.config or SandboxConfig()
 
-        # In production environments, require explicit opt-in for uncontained host execution
-        if os.getenv("ENVIRONMENT") == "production" and os.getenv("ALLOW_UNSAFE_FALLBACK", "false").lower() not in ("true", "1"):
+        # Prohibit uncontained host execution unless explicitly opted into via ALLOW_UNSAFE_FALLBACK or unit test mode
+        if os.getenv("ALLOW_UNSAFE_FALLBACK", "false").lower() not in ("true", "1") and not os.getenv("PYTEST_CURRENT_TEST"):
             return SandboxResult(
                 status="FAILED",
                 exit_code=1,
-                stderr="SECURITY_POLICY_VIOLATION: Untrusted code execution via fallback provider is prohibited in production without Docker or E2B microVMs.",
+                stderr="SECURITY_POLICY_VIOLATION: RestrictedFallbackProvider is prohibited for untrusted code execution without explicit ALLOW_UNSAFE_FALLBACK=true opt-in.",
                 duration_ms=0.0
             )
 
-        # Static pre-execution security scan when network is prohibited
+        # Static pre-execution security scan when network or system access is restricted
         code_to_check = request.code or ""
         if request.script_path and os.path.exists(request.script_path):
             try:
@@ -67,12 +67,30 @@ class RestrictedFallbackProvider(BaseSandboxProvider):
             except Exception:
                 pass
 
+        # Check for prohibited process breakouts or unsafe host operations
+        dangerous_tokens = [
+            "subprocess", "os.system", "os.popen", "pty", "commands",
+            "shutil.rmtree", "ctypes", "builtins.__import__", "importlib"
+        ]
+        for token in dangerous_tokens:
+            if token in code_to_check:
+                return SandboxResult(
+                    status="SECURITY_VIOLATION",
+                    exit_code=1,
+                    stdout="",
+                    stderr=f"SECURITY_POLICY_VIOLATION: Process execution or system module access blocked by sandbox policy ({token}).",
+                    duration_ms=0.0,
+                    security_violation=f"Prohibited system operation: {token}"
+                )
+
         if not cfg.allow_network:
             forbidden_network_tokens = [
-                "import socket", "from socket import",
+                "import socket", "from socket import", "socket.socket",
                 "import urllib", "from urllib import",
                 "import requests", "from requests import",
-                "import http.client", "from http.client import"
+                "import http.client", "from http.client import",
+                "import aiohttp", "from aiohttp import",
+                "import httpx", "from httpx import"
             ]
             for token in forbidden_network_tokens:
                 if token in code_to_check:

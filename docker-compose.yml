@@ -41,6 +41,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SANDBOX_PROVIDER: ${SANDBOX_PROVIDER:-docker}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - path: .env
         required: false
@@ -64,6 +67,9 @@ services:
       REDIS_URL: redis://redis:6379/0
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/0
+      SANDBOX_PROVIDER: ${SANDBOX_PROVIDER:-docker}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - path: .env
         required: false

@@ -16,7 +16,19 @@ from typing import Optional, Dict, Any, Tuple
 logger = logging.getLogger("WebhookService")
 
 def get_webhook_encryption_key() -> bytes:
-    master = os.getenv("WEBHOOK_ENCRYPTION_KEY") or os.getenv("APP_SECRET") or "autojudge_default_master_enc_key_9988"
+    """
+    Resolves master encryption key for partner signing secrets.
+    Fails closed in production if deployment does not configure a secret key.
+    """
+    master = os.getenv("WEBHOOK_ENCRYPTION_KEY") or os.getenv("APP_SECRET")
+    if not master:
+        if os.getenv("ENVIRONMENT") == "production":
+            raise RuntimeError(
+                "CRITICAL_SECURITY_ERROR: Production deployment must configure "
+                "WEBHOOK_ENCRYPTION_KEY or APP_SECRET for webhook secret encryption."
+            )
+        # Development / CI test fallback
+        master = "autojudge_default_master_enc_key_9988"
     return hashlib.sha256(master.encode("utf-8")).digest()
 
 def encrypt_webhook_secret(plaintext: str) -> str:

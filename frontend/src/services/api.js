@@ -2,8 +2,8 @@ import rawSubmissions from "../mockData/submissions.json";
 import { calculateSynthesisScore, generateSynthesisSummary } from "../utils/synthesisAgent";
 import { generateParticipantFeedback } from "../utils/feedbackAgent";
 
-// The base URL for Person 1's FastAPI orchestrator
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+// The base URL for the FastAPI orchestrator and B2B API endpoints
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 
 /**
  * Helper to simulate a network delay when returning mock data
@@ -558,28 +558,16 @@ export const createBillingOrder = async (packageId) => {
 };
 
 export const verifyPayment = async (orderId, paymentId, signature) => {
-	try {
-		const res = await fetch(`${V1_BASE_URL}/billing/verify-payment`, {
-			method: "POST",
-			headers: getAuthHeaders({ "Content-Type": "application/json" }),
-			body: JSON.stringify({ order_id: orderId, payment_id: paymentId, signature })
-		});
-		if (!res.ok) throw new Error(`HTTP ${res.status}`);
-		return await res.json();
-	} catch (e) {
-		const curr = await fetchBillingBalance();
-		curr.balance += 100;
-		curr.total_purchased += 100;
-		localStorage.setItem("autojudge_billing_balance", JSON.stringify(curr));
-		return {
-			status: "success",
-			message: "Simulated payment fulfilled successfully.",
-			order_id: orderId,
-			payment_id: paymentId,
-			credits_granted: 100,
-			new_balance: curr.balance
-		};
+	const res = await fetch(`${V1_BASE_URL}/billing/verify-payment`, {
+		method: "POST",
+		headers: getAuthHeaders({ "Content-Type": "application/json" }),
+		body: JSON.stringify({ order_id: orderId, payment_id: paymentId, signature })
+	});
+	if (!res.ok) {
+		const errData = await res.json().catch(() => ({}));
+		throw new Error(errData.detail || `Payment verification failed with HTTP ${res.status}`);
 	}
+	return await res.json();
 };
 
 export const fetchBillingUsage = async () => {

@@ -62,12 +62,16 @@ def index_submission_codebase(
         except ValueError:
             is_under_temp = False
 
-        # Only allow paths strictly under allowed base directory or explicit eval_repo_* directory inside tempdir
-        is_safe_eval_dir = is_under_temp and os.path.basename(requested_real).startswith("eval_repo_")
+        # Only allow paths strictly under allowed base directory or explicit eval_repo_{submission_id} directory inside tempdir
+        # Binds the directory strictly to the authorized submission ID to prevent cross-submission file indexing
+        is_safe_eval_dir = is_under_temp and (
+            os.path.basename(requested_real) == f"eval_repo_{submission_id}" or
+            os.path.basename(requested_real).startswith(f"eval_repo_{submission_id}_")
+        )
         if not (is_under_base or is_safe_eval_dir):
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Security policy violation: repo_path must be confined within the authorized submission directory."
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Security policy violation: repo_path must be confined within the authorized directory for submission '{submission_id}'."
             )
         target_path = requested_real
     else:

@@ -11,12 +11,23 @@ engine = create_engine(SQLALCHEMY_DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+MIGRATION_STATUS = {
+    "completed": True,
+    "applied_columns": [],
+    "failed_columns": [],
+    "error_message": None
+}
+
 def run_schema_migrations(target_engine):
     """
     Safely inspects existing database schema and applies ALTER TABLE migrations
     for any missing columns added to the SQLAlchemy models.
-    Compatible with PostgreSQL and SQLite.
+    Surfaces migration failures to ensure deployment health correctly reflects incomplete schema.
     """
+    global MIGRATION_STATUS
+    failed_migrations = []
+    applied_migrations = []
+
     try:
         inspector = inspect(target_engine)
         existing_tables = inspector.get_table_names()
@@ -33,8 +44,24 @@ def run_schema_migrations(target_engine):
                             try:
                                 conn.execute(text(stmt))
                                 conn.commit()
-                            except Exception:
-                                pass
+                                applied_migrations.append(f"{table_name}.{col.name}")
+                            except Exception as mig_err:
+                                # Re-inspect to check if column was added concurrently by another worker
+                                re_inspected = {c["name"] for c in inspect(target_engine).get_columns(table_name)}
+                                if col.name not in re_inspected:
+                                    failed_migrations.append((f"{table_name}.{col.name}", str(mig_err)))
+
+        if failed_migrations:
+            MIGRATION_STATUS["completed"] = False
+            MIGRATION_STATUS["failed_columns"] = failed_migrations
+            MIGRATION_STATUS["error_message"] = f"Failed migrations: {failed_migrations}"
+            raise RuntimeError(f"Database schema migration failed on startup: {failed_migrations}")
+        else:
+            MIGRATION_STATUS["completed"] = True
+            MIGRATION_STATUS["applied_columns"] = applied_migrations
     except Exception as e:
         import logging
-        logging.getLogger("DatabaseMigration").warning(f"Schema migration skipped or deferred: {e}")
+        logging.getLogger("DatabaseMigration").error(f"Schema migration error: {e}")
+        MIGRATION_STATUS["completed"] = False
+        MIGRATION_STATUS["error_message"] = str(e)
+        raise

@@ -65,59 +65,97 @@ class E2BSandboxProvider(BaseSandboxProvider):
                     )
 
         start_time = time.perf_counter()
+        sandbox = None
 
         try:
             # Pluggable dynamic import of e2b_code_interpreter
             from e2b_code_interpreter import Sandbox
 
-            # Initialize ephemeral cloud microVM with configured timeout
-            with Sandbox(api_key=self.api_key, timeout=int(cfg.timeout_seconds) + 5) as sandbox:
-                # If script file is specified, read code
-                code_content = request.code or ""
-                if not code_content and request.script_path and os.path.exists(request.script_path):
-                    with open(request.script_path, "r", encoding="utf-8", errors="ignore") as f:
-                        code_content = f.read()
+            # Initialize ephemeral cloud microVM with supported client/factory API
+            timeout_val = int(cfg.timeout_seconds) + 5
+            if hasattr(Sandbox, "create"):
+                sandbox = Sandbox.create(api_key=self.api_key, timeout=timeout_val)
+            else:
+                sandbox = Sandbox(api_key=self.api_key, timeout=timeout_val)
 
-                # Feed request test-case stdin into execution environment
-                if request.stdin_data:
-                    stdin_repr = repr(request.stdin_data)
-                    if request.language == "python" or not request.language:
-                        code_content = f"import sys, io\nsys.stdin = io.StringIO({stdin_repr})\n" + code_content
+            # Apply OS-level resource limits and network restrictions in the microVM
+            if hasattr(sandbox, "commands") and hasattr(sandbox.commands, "run"):
+                try:
+                    mem_kb = int(cfg.memory_limit_mb) * 1024
+                    pids = int(cfg.pids_limit)
+                    sandbox.commands.run(f"ulimit -v {mem_kb} 2>/dev/null; ulimit -u {pids} 2>/dev/null", timeout=3)
+                except Exception:
+                    pass
 
-                # Enforce runtime network disablement for Python microVM
-                if not cfg.allow_network and (request.language == "python" or not request.language):
+                if not cfg.allow_network:
+                    try:
+                        sandbox.commands.run("iptables -F 2>/dev/null; iptables -P OUTPUT DROP 2>/dev/null; ip route del default 2>/dev/null", timeout=3)
+                    except Exception:
+                        pass
+
+            # If script file is specified, read code
+            code_content = request.code or ""
+            if not code_content and request.script_path and os.path.exists(request.script_path):
+                with open(request.script_path, "r", encoding="utf-8", errors="ignore") as f:
+                    code_content = f.read()
+
+            # Feed test-case stdin into execution environment across Python, JS, and TS
+            if request.stdin_data:
+                stdin_repr = repr(request.stdin_data)
+                if request.language in ("python", None, ""):
+                    code_content = f"import sys, io\nsys.stdin = io.StringIO({stdin_repr})\n" + code_content
+                elif request.language in ("javascript", "js", "typescript", "ts"):
+                    js_stdin = (
+                        "const { Readable } = require('stream');\n"
+                        f"const _mockStdin = new Readable({{ read() {{ this.push({stdin_repr}); this.push(null); }} }});\n"
+                        "Object.defineProperty(process, 'stdin', { value: _mockStdin, configurable: true });\n"
+                    )
+                    code_content = js_stdin + code_content
+
+            # Enforce runtime network disablement across runtimes
+            if not cfg.allow_network:
+                if request.language in ("python", None, ""):
                     net_guard = (
-                        "import socket\n"
+                        "import socket, subprocess\n"
                         "def _blocked_socket(*args, **kwargs):\n"
                         "    raise PermissionError('Outbound network disabled by sandbox policy')\n"
                         "socket.socket = _blocked_socket\n"
                         "socket.create_connection = _blocked_socket\n"
                     )
                     code_content = net_guard + code_content
+                elif request.language in ("javascript", "js", "typescript", "ts"):
+                    js_guard = (
+                        "try {\n"
+                        "  const net = require('net'); net.connect = () => { throw new Error('Outbound network disabled by sandbox policy'); };\n"
+                        "  const http = require('http'); http.request = () => { throw new Error('Outbound network disabled by sandbox policy'); };\n"
+                        "  const https = require('https'); https.request = () => { throw new Error('Outbound network disabled by sandbox policy'); };\n"
+                        "} catch (e) {}\n"
+                    )
+                    code_content = js_guard + code_content
 
-                execution = sandbox.run_code(code_content)
-                duration_ms = (time.perf_counter() - start_time) * 1000.0
+            execution = sandbox.run_code(code_content)
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
 
-                stdout_text = "\n".join(execution.logs.stdout) if execution.logs.stdout else ""
-                stderr_text = "\n".join(execution.logs.stderr) if execution.logs.stderr else ""
+            stdout_text = "\n".join(execution.logs.stdout) if execution.logs.stdout else ""
+            stderr_text = "\n".join(execution.logs.stderr) if execution.logs.stderr else ""
 
-                status = "COMPLETED" if not execution.error else "FAILED"
-                security_violation = None
+            status = "COMPLETED" if not execution.error else "FAILED"
+            security_violation = None
 
-                if execution.error:
-                    stderr_text += f"\n{execution.error.name}: {execution.error.value}"
-                    if "Outbound network disabled" in str(execution.error.value):
-                        status = "SECURITY_VIOLATION"
-                        security_violation = "Outbound network connection blocked by sandbox policy."
+            if execution.error:
+                stderr_text += f"\n{execution.error.name}: {execution.error.value}"
+                if "Outbound network disabled" in str(execution.error.value):
+                    status = "SECURITY_VIOLATION"
+                    security_violation = "Outbound network connection blocked by sandbox policy."
 
-                return SandboxResult(
-                    status=status,
-                    exit_code=0 if status == "COMPLETED" else 1,
-                    stdout=stdout_text,
-                    stderr=stderr_text,
-                    duration_ms=round(duration_ms, 2),
-                    security_violation=security_violation
-                )
+            return SandboxResult(
+                status=status,
+                exit_code=0 if status == "COMPLETED" else 1,
+                stdout=stdout_text,
+                stderr=stderr_text,
+                duration_ms=round(duration_ms, 2),
+                security_violation=security_violation
+            )
 
         except ImportError:
             return SandboxResult(
@@ -134,3 +172,9 @@ class E2BSandboxProvider(BaseSandboxProvider):
                 stderr=f"E2B_EXECUTION_EXCEPTION: {str(e)}",
                 duration_ms=round(duration_ms, 2)
             )
+        finally:
+            if sandbox and hasattr(sandbox, "close"):
+                try:
+                    sandbox.close()
+                except Exception:
+                    pass

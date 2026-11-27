@@ -85,15 +85,56 @@ export default function DeveloperConsole() {
 		setPurchaseSuccessMsg("");
 		try {
 			const order = await createBillingOrder(packageId);
-			// Simulate or execute verification
-			const paymentId = "pay_sim_" + Math.random().toString(36).substring(2, 12);
-			const signature = "sig_verified_simulated_hmac_256";
-			const res = await verifyPayment(order.order_id, paymentId, signature);
-			setPurchaseSuccessMsg(`Payment fulfilled! Added ${res.credits_granted} credits.`);
-			const updatedBalance = await fetchBillingBalance();
-			setBilling(updatedBalance);
-			const updatedUsage = await fetchBillingUsage();
-			setUsage(updatedUsage);
+
+			// Real Razorpay Standard Checkout integration when SDK script is loaded
+			if (typeof window !== "undefined" && window.Razorpay && order.key_id && !order.key_id.startsWith("rzp_test_simulated")) {
+				const rzpOptions = {
+					key: order.key_id,
+					amount: order.amount_paise,
+					currency: order.currency || "INR",
+					name: "AutoJudge",
+					description: order.package_name,
+					order_id: order.order_id,
+					handler: async function (response) {
+						try {
+							setBillingLoading(true);
+							const res = await verifyPayment(
+								response.razorpay_order_id,
+								response.razorpay_payment_id,
+								response.razorpay_signature
+							);
+							setPurchaseSuccessMsg(`Payment fulfilled! Added ${res.credits_granted} credits.`);
+							const updatedBalance = await fetchBillingBalance();
+							setBilling(updatedBalance);
+							const updatedUsage = await fetchBillingUsage();
+							setUsage(updatedUsage);
+						} catch (verifyErr) {
+							alert("Payment verification failed: " + verifyErr.message);
+						} finally {
+							setBillingLoading(false);
+						}
+					},
+					prefill: {
+						name: "Hackathon Organizer",
+						email: "organizer@example.com"
+					},
+					theme: {
+						color: "#6366f1"
+					}
+				};
+				const rzp = new window.Razorpay(rzpOptions);
+				rzp.open();
+			} else {
+				// Non-production simulation mode
+				const paymentId = "pay_sim_" + Math.random().toString(36).substring(2, 12);
+				const signature = "sig_verified_simulated_hmac_256";
+				const res = await verifyPayment(order.order_id, paymentId, signature);
+				setPurchaseSuccessMsg(`Simulated payment fulfilled! Added ${res.credits_granted} credits.`);
+				const updatedBalance = await fetchBillingBalance();
+				setBilling(updatedBalance);
+				const updatedUsage = await fetchBillingUsage();
+				setUsage(updatedUsage);
+			}
 		} catch (err) {
 			alert("Checkout failed: " + err.message);
 		} finally {

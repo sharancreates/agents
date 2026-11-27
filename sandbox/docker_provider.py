@@ -39,7 +39,10 @@ class DockerSandboxProvider(BaseSandboxProvider):
         # Resolve language-appropriate image when unset
         if cfg.image:
             image = cfg.image
-        elif request.language in ("javascript", "js", "typescript", "ts"):
+        elif request.language in ("typescript", "ts"):
+            # Node 22 includes native zero-dependency TypeScript support via --experimental-strip-types
+            image = os.getenv("SANDBOX_TYPESCRIPT_IMAGE", "node:22-alpine")
+        elif request.language in ("javascript", "js"):
             image = os.getenv("SANDBOX_NODE_IMAGE", "node:20-alpine")
         else:
             image = self.default_image
@@ -79,7 +82,13 @@ class DockerSandboxProvider(BaseSandboxProvider):
             elif request.language in ("javascript", "js"):
                 cmd = ["node", f"/sandbox_env/{target_filename}"]
             elif request.language in ("typescript", "ts"):
-                cmd = ["ts-node", f"/sandbox_env/{target_filename}"]
+                # Use Node 22+ native TypeScript execution (--experimental-strip-types)
+                # or fallback to ts-node if explicitly specified
+                ts_runner = os.getenv("SANDBOX_TS_RUNNER", "native")
+                if ts_runner == "ts-node":
+                    cmd = ["ts-node", f"/sandbox_env/{target_filename}"]
+                else:
+                    cmd = ["node", "--experimental-strip-types", f"/sandbox_env/{target_filename}"]
             else:
                 cmd = ["python3", "-u", f"/sandbox_env/{target_filename}"]
 

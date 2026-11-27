@@ -4,7 +4,17 @@
 - **Current Milestone**: Commercial Agentic AI & SaaS Transformation
 - **Current Phase**: All Milestone Phases Complete (Phases 1, 2, 3, 4, 4.5, and 5 Verified & Closed)
 - **Milestone Status**: Commercial Agentic AI & SaaS Transformation COMPLETE
-- **Planning Status**: 100% Planned, Executed, and Verified (60/60 passing tests)
+- **Planning Status**: 100% Planned, Executed, and Verified (63/63 passing tests)
+
+## PR #14 Aligned Specification
+- **Title**: `feat: AutoJudge B2B Platform, Multi-Agent Deliberation Council, Sandbox MicroVM Isolation, & Developer Portal`
+- **Scope**: Replaces legacy CLI/action prototypes with the comprehensive AutoJudge enterprise architecture:
+  1. **Sandbox Execution Engine**: Multi-language runtime isolation (Docker `--network none`, least-privilege UID 1000, read-only rootfs, E2B Cloud MicroVM provider).
+  2. **Multi-Agent Deliberation Council**: 6-agent evaluative consensus (Recon, dynamic QA synthesis, Quality AST complexity, Git Forensics, Critic calibration, and Feedback dossier).
+  3. **B2B API & Multi-Tenancy**: Organization row-level isolation, scoped `ak_live_` API keys with rate-limiting, and signed HMAC-SHA256 webhook callbacks.
+  4. **Razorpay Monetization & Quota Gating**: Atomic credit deductions, order management, integer paise pricing, and cryptographically verified HMAC signatures.
+  5. **AST Codebase RAG & Copilot**: pgvector/cosine retrieval, sponsor compliance auditing, and contextual code citation generation.
+  6. **Enterprise Portal & Observability**: Real-time Server-Sent Events (SSE) telemetry stream, Developer API/Webhook/Billing console, and Judge Copilot interface.
 
 ## Architecture Baseline
 - **Backend**: FastAPI (`api/main.py`), SQLAlchemy ORM (`api/models.py`), Celery (`orchestrator/celery_app.py`)
