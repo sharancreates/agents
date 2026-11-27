@@ -6,6 +6,7 @@ import SubmissionDetail from "./pages/SubmissionDetail";
 import Submit from "./pages/Submit";
 import Login from "./pages/Login";
 import Leaderboard from "./pages/Leaderboard";
+import DeveloperConsole from "./pages/DeveloperConsole";
 
 function App() {
 	return (
@@ -18,6 +19,7 @@ function App() {
 						<Route path="/" element={<Dashboard />} />
 						<Route path="/submit" element={<Submit />} />
 						<Route path="/leaderboard" element={<Leaderboard />} />
+						<Route path="/developer" element={<DeveloperConsole />} />
 						<Route
 							path="/submission/:id"
 							element={<SubmissionDetail />}

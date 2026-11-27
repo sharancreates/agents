@@ -13,11 +13,24 @@ from api import models
 from api.synthesis_service import calculate_synthesis_score, generate_synthesis_summary, get_default_weights
 from api.feedback_service import generate_participant_feedback
 from orchestrator.celery_app import process_submission_task
+from api.v1_endpoints import router as v1_router
+from api.billing_endpoints import router as billing_router
+from api.rag_endpoints import router as rag_router
 
-# Create the database tables automatically on startup
-models.Base.metadata.create_all(bind=engine)
+# Attempt database tables creation and schema migrations defensively
+try:
+    models.Base.metadata.create_all(bind=engine)
+    from api.database import run_schema_migrations
+    run_schema_migrations(engine)
+except Exception as e:
+    print(f"Warning: Database connection deferred: {e}")
 
-app = FastAPI(title="Hackathon Evaluation Pipeline")
+app = FastAPI(title="AutoJudge - Multi-Agent Evaluation & B2B Platform", version="2.0.0")
+
+# Mount B2B Developer API, Billing, and RAG Routers
+app.include_router(v1_router)
+app.include_router(billing_router)
+app.include_router(rag_router)
 
 # Enable CORS for frontend communication with explicit origins for credentials support
 app.add_middleware(
@@ -116,7 +129,22 @@ def startup_event():
 
 @app.get("/health")
 def health_check():
-    return {"status": "healthy", "service": "orchestrator"}
+    from api.database import MIGRATION_STATUS
+    from sqlalchemy import text
+    db_ok = True
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception:
+        db_ok = False
+
+    is_healthy = db_ok and MIGRATION_STATUS.get("completed", True)
+    return {
+        "status": "healthy" if is_healthy else "degraded",
+        "service": "orchestrator",
+        "database": "connected" if db_ok else "unreachable",
+        "schema_migration": "completed" if MIGRATION_STATUS.get("completed") else MIGRATION_STATUS
+    }
 
 # Submissions Endpoints
 @app.get("/api/submissions")

@@ -32,8 +32,10 @@ class MetricsAggregator:
 
         # Create instance to inspect methods safely
         detector = LanguageDetector()
+        ignore_dirs = {".git", ".venv", "venv", "__pycache__", "node_modules", "dist", "build", ".idea", ".vscode"}
 
-        for root, _, files in os.walk(dir_path):
+        for root, dirs, files in os.walk(dir_path):
+            dirs[:] = [d for d in dirs if d not in ignore_dirs and not d.startswith(".")]
             for file in files:
                 file_path = os.path.join(root, file)
                 

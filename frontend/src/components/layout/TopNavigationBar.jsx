@@ -5,9 +5,10 @@ export default function TopNavigationBar() {
 	const { user, logout } = useAuth();
 	const location = useLocation();
 
-	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit") && !location.pathname.includes("/leaderboard"));
+	const isSubmissionsActive = location.pathname === "/" || (location.pathname.startsWith("/submission") && !location.pathname.includes("/submit") && !location.pathname.includes("/leaderboard") && !location.pathname.includes("/developer"));
 	const isSubmitActive = location.pathname === "/submit";
 	const isLeaderboardActive = location.pathname === "/leaderboard";
+	const isDeveloperActive = location.pathname === "/developer";
 
 	return (
 		<header
@@ -89,6 +90,21 @@ export default function TopNavigationBar() {
 							}}
 						>
 							Leaderboard
+						</Link>
+						<Link
+							to="/developer"
+							style={{
+								color: isDeveloperActive ? "var(--text-primary)" : "var(--text-secondary)",
+								fontSize: "0.875rem",
+								fontWeight: 500,
+								transition: "color var(--transition)",
+								display: "flex",
+								alignItems: "center",
+								gap: "0.3rem"
+							}}
+						>
+							<span>Developer</span>
+							<span style={{ fontSize: "0.65rem", background: "rgba(99, 102, 241, 0.2)", color: "var(--accent)", padding: "0.1rem 0.35rem", borderRadius: "8px", fontWeight: 600 }}>API</span>
 						</Link>
 					</nav>
 				</div>
